@@ -135,9 +135,9 @@ pixi run nextflow run main.nf \
   same deacon version as the pipeline (0.15.0). `--skip_host_removal` runs without it.
 - **`--deacon_rel_threshold`:** the share of a read's minimizers that must match the index,
   which defaults to `0.05` rather than deacon's own `0.01`. On trimmed reads from pure
-  cultures, `0.01` removed 106 of 130,932 reads, nearly all of the kind checked being
-  full-length bacterial 16S, while `0.05` removed 2. Simulated human reads at Q12 and above
-  were still all removed. Below that, removal falls off (66% at Q10), but `--quality_filtering`
+  cultures, `0.01` removed 106 of 130,932 reads while `0.05` removed 2. On untrimmed reads,
+  nearly all reads flagged at `0.01` were full-length bacterial 16S. Simulated human reads
+  at Q12 and above were still all removed at `0.05`. Below that, removal falls off (66% at Q10), but `--quality_filtering`
   drops most such reads anyway.
 - **`--db`:** defaults to the bundled 2026 EMU database, which no longer needs unpacking
   by hand. Both classifiers use it.
