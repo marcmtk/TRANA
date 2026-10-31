@@ -11,7 +11,8 @@ include { methodsDescriptionText                 } from '../subworkflows/local/u
 include { GENERATE_YAML                          } from '../modules/local/generate_yaml/main.nf'
 include { GENERATE_MASTER_HTML                   } from '../modules/local/generate_master_html/main.nf'
 include { EMU_ABUNDANCE                          } from '../modules/local/emu/abundance/main.nf'
-include { KRONA_KTIMPORTTAXONOMY                 } from '../modules/nf-core/krona/ktimporttaxonomy/main.nf'
+include { KRONA_KTIMPORTTEXT                     } from '../modules/nf-core/krona/ktimporttext/main.nf'
+include { EMU_REPORT_TO_KRONA                    } from '../modules/local/emu/report_to_krona/main.nf'
 include { CUSTOM_DUMPSOFTWAREVERSIONS            } from '../modules/nf-core/custom/dumpsoftwareversions/main.nf'
 include { MULTIQC                                } from '../modules/nf-core/multiqc/main.nf'
 include { FASTQC                                 } from '../modules/nf-core/fastqc/main.nf'
@@ -56,7 +57,7 @@ workflow TRANA {
     // MODULE: Unpack the emu database into the form both emu and savont read
     PREPARE_EMU_DB(
         file(params.db, checkIfExists: true),
-        params.db_exclude_ids ? file(params.db_exclude_ids, checkIfExists: true) : []
+        params.db_exclude_ids && !params.skip_db_exclusion ? file(params.db_exclude_ids, checkIfExists: true) : []
     )
     ch_versions = ch_versions.mix(PREPARE_EMU_DB.out.versions)
     ch_emu_db = PREPARE_EMU_DB.out.db
@@ -200,11 +201,15 @@ workflow TRANA {
     ch_versions = ch_versions.mix(EMU_ABUNDANCE.out.versions)
     if (params.run_krona) {
         // MODULE: Run krona plot
-        KRONA_KTIMPORTTAXONOMY(
-            EMU_ABUNDANCE.out.report,
-            file(params.krona_taxonomy_tab, checkExists: true)
+        EMU_REPORT_TO_KRONA(EMU_ABUNDANCE.out.report)
+        ch_versions = ch_versions.mix(EMU_REPORT_TO_KRONA.out.versions.first())
+        KRONA_KTIMPORTTEXT(EMU_REPORT_TO_KRONA.out.krona_text)
+        ch_versions = ch_versions.mix(
+            KRONA_KTIMPORTTEXT.out.versions_krona
+                .first()
+                .map { process, tool, version -> "\"${process}\":\n    ${tool}: ${version}\n" }
+                .collectFile(name: 'krona_versions.yml')
         )
-        ch_versions = ch_versions.mix(KRONA_KTIMPORTTAXONOMY.out.versions.first())
     }
 
     // MODULE: run translate_taxids

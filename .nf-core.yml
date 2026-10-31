@@ -28,7 +28,6 @@ lint:
     - report_comment
   nextflow_config:
     - config_defaults:
-        - params.krona_taxonomy_tab
         - params.master_template
         - params.trace_timestamp
         - params.genomes

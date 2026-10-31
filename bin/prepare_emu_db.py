@@ -96,7 +96,8 @@ def prepare(db_root, outdir, exclude_path, summary_path):
     if missing:
         sys.exit(
             f"ERROR: {len(missing)} of {len(exclude)} IDs in {exclude_path} are not in the database, "
-            f"e.g. {sorted(missing)[0]}. Was the list made for another database release?"
+            f"e.g. {sorted(missing)[0]}. Was the list made for another database release? "
+            "Use --db_exclude_ids with a matching list, or --skip_db_exclusion."
         )
 
     (outdir / SAVONT_MARKER).write_text(SAVONT_DB_NAME)

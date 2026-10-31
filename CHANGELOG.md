@@ -13,13 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove human reads with deacon, using the nf-core module (`--deacon_index`, `--skip_host_removal`)
 - Run the marcmtk fork of savont on the same reads as EMU (`--run_savont`)
 - `results/classifier_comparison.tsv` with both classifiers' calls and cross-genus ties in savont
-- `PREPARE_EMU_DB`, which accepts a folder or `.tar.gz`, pads `taxonomy.tsv` for savont and drops references listed in `--db_exclude_ids`
+- `PREPARE_EMU_DB`, which accepts a folder or `.tar.gz`, pads `taxonomy.tsv` for savont and drops the references in `--db_exclude_ids`
 - `workstation` profile and `pixi.toml` for running with podman on one machine
 - Warnings when a sample is dropped for having no reads
 
 ### Changed
 
-- The bundled database is now the 2026 EMU database
+- The bundled database is now the 2026 EMU database (rrnDB v5.10 and NCBI RefSeq 16S, built by @UFDuttonLab)
+- `--db_exclude_ids` is on by default with the audit list for that database (`--skip_db_exclusion` to opt out)
+- Krona plots use `ktImportText` with the lineage from the EMU report. `--krona_taxonomy_tab` and the bundled Krona taxonomy are gone, as 2,821 of the database's 27,670 taxids were missing from it
 - EMU 3.5.4 to 3.6.2
 - The database is staged as a process input rather than read from a host path
 - `--save_merged_reads` is off by default, as those reads still contain any human reads

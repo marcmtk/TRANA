@@ -183,8 +183,12 @@
                 "db_exclude_ids": {
                     "type": "string",
                     "format": "file-path",
-                    "exists": true,
-                    "description": "FASTA header IDs to drop from the database, one per line. assets/databases/emu_database/emu2026_proposed_exclusion_ids.txt lists the references that an audit of the 2026 database proposed to exclude."
+                    "description": "FASTA header IDs to drop from the database, one per line. The default is the audit list for the bundled 2026 database, so a different --db needs its own list or --skip_db_exclusion.",
+                    "default": "${projectDir}/assets/databases/emu_database/emu2026_proposed_exclusion_ids.txt"
+                },
+                "skip_db_exclusion": {
+                    "type": "boolean",
+                    "description": "Use the database as it is, without dropping any references"
                 },
                 "seqtype": {
                     "type": "string",
@@ -398,11 +402,6 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Run krona, true or false"
-                },
-                "krona_taxonomy_tab": {
-                    "type": "string",
-                    "default": "assets/databases/krona/taxonomy/taxonomy.tab",
-                    "description": "Path to the taxonomy.tab used by Krona"
                 }
             }
         },

@@ -21,6 +21,8 @@ This pipeline uses code and infrastructure developed and maintained by the [nf-c
 
 - [Savont](https://github.com/bluenote-1577/savont), using the fork at <https://github.com/marcmtk/savont>
 
+- [Updated EMU 16S rRNA database](https://osf.io/32sh5), rrnDB v5.10 and NCBI RefSeq, March 2026, built by [UFDuttonLab](https://github.com/UFDuttonLab/emu-database-update)
+
 - [FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/)
 
 - [MultiQC](https://pubmed.ncbi.nlm.nih.gov/27312411/)

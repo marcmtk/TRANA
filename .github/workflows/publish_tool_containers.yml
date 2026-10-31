@@ -2,12 +2,8 @@ name: Publish tool containers
 
 # barbell and savont are built from the marcmtk forks, which aren't on bioconda.
 # Each image is tagged with the short commit it's built from, as set in its Dockerfile.
+# Images are public, so this only runs when started by hand.
 on:
-  push:
-    paths:
-      - "containers/barbell/**"
-      - "containers/savont/**"
-      - ".github/workflows/publish_tool_containers.yml"
   workflow_dispatch:
 
 jobs:

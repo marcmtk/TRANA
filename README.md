@@ -82,10 +82,7 @@ Relative abundance comparison to controls
    Please only use it within pipelines as a last resort. See
    [docs](https://nf-co.re/usage/configuration#basic-configuration-profiles)).
 3. Add you samples to an input file e.g., `sample_sheet.csv`. See examples.
-4. Run `make install` which will gunzip all gzipped files in the database
-   directory (`assets/databases/emu_database`) and the krona/taxonomy directory
-   (`assets/databases/krona/taxonomy`)
-5. Run your command:
+4. Run your command:
 
 ```bash
 nextflow run main.nf \
@@ -109,7 +106,6 @@ for some more info).
 
 ```bash
 pixi install   # Nextflow and podman; or use your own Nextflow with docker or singularity
-make install   # unpacks the Krona taxonomy
 
 pixi run nextflow run main.nf \
   -profile podman,workstation \
@@ -139,12 +135,19 @@ pixi run nextflow run main.nf \
   nearly all reads flagged at `0.01` were full-length bacterial 16S. Simulated human reads
   at Q12 and above were still all removed at `0.05`. Below that, removal falls off (66% at Q10), but `--quality_filtering`
   drops most such reads anyway.
-- **`--db`:** defaults to the bundled 2026 EMU database, which no longer needs unpacking
-  by hand. Both classifiers use it.
-- **`--db_exclude_ids`:** drops references from the database. To drop the entries that an
-  audit of the 2026 database proposed to exclude, pass
-  `assets/databases/emu_database/emu2026_proposed_exclusion_ids.txt`. It is off by default:
-  the list holds 177 references, and 45 of them are the only reference for their species.
+- **`--db`:** defaults to the bundled 2026 EMU database, and both classifiers use it. The
+  database was built by @UFDuttonLab from rrnDB v5.10 and NCBI RefSeq 16S (March 2026),
+  not by the authors of EMU, who link to it from their README. Its authors reported it as
+  still under internal testing ([issue](https://github.com/treangenlab/emu/issues/118),
+  [download](https://osf.io/32sh5), [build](https://github.com/UFDuttonLab/emu-database-update)).
+- **`--db_exclude_ids`:** drops references from the database. By default it uses
+  `assets/databases/emu_database/emu2026_proposed_exclusion_ids.txt`, the 177 references that
+  an audit of this database found to be likely mislabelled, contaminated or strong outliers.
+  45 of them are the only reference for their species, so those species can't be called.
+  The list only fits this database, and the pipeline stops if an ID isn't found: with another
+  `--db`, give it a matching list or use `--skip_db_exclusion`.
+- **Krona plots:** the lineage comes from the EMU report itself, so no separate Krona
+  taxonomy is needed and no taxon can fall out of the plot.
 - **Profiles:** `workstation` caps resources to 16 CPUs and 60 GB, as EMU otherwise asks for
   72 GB. Barbell and savont need a container, so the `conda` profile only works with
   `--skip_barbell --run_savont false`.

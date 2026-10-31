@@ -1,0 +1,22 @@
+name: emu_report_to_krona
+description: Turn an emu abundance report into the text format of ktImportText
+keywords:
+  - krona
+  - emu
+tools:
+  - emu_report_to_krona.py:
+      description: Local script in bin/
+input:
+  - meta:
+      type: map
+      description: Sample information
+  - report:
+      type: file
+      description: emu relative abundance table
+output:
+  - krona_text:
+      type: file
+      description: Tab-separated counts and lineage, without a header
+  - versions:
+      type: file
+      description: File containing software versions
