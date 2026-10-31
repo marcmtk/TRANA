@@ -16,6 +16,11 @@
                         "git_sha": "4c4eacf68c420ce477e945c04c16f4338ddaca36",
                         "installed_by": ["modules"]
                     },
+                    "deacon/filter": {
+                        "branch": "master",
+                        "git_sha": "7b3452a23773f687ededb4befd037920e5a51341",
+                        "installed_by": ["modules"]
+                    },
                     "falco": {
                         "branch": "master",
                         "git_sha": "05954dab2ff481bcb999f24455da29a5828af08d",

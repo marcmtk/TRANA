@@ -6,6 +6,9 @@ process GENERATE_YAML {
         'docker://clinicalgenomicslund/eyrie-popup:1.0.0':
         'docker://clinicalgenomicslund/eyrie-popup:1.0.0' }"
 
+    // The image's entrypoint is popup, which would swallow Nextflow's bash wrapper
+    containerOptions "${ workflow.containerEngine in ['docker', 'podman'] ? '--entrypoint=' : '' }"
+
     input:
     tuple val(meta), val(input_dir)
 

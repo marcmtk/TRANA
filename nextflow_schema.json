@@ -10,7 +10,9 @@
             "type": "object",
             "fa_icon": "fas fa-terminal",
             "description": "Define where the pipeline should find input data and save output data.",
-            "required": ["outdir"],
+            "required": [
+                "outdir"
+            ],
             "properties": {
                 "input": {
                     "type": "string",
@@ -64,7 +66,14 @@
                     "description": "Method used to save pipeline results to output directory.",
                     "help_text": "The Nextflow `publishDir` option specifies which intermediate files should be saved to the output directory. This option tells the pipeline what method should be used to move these files. See [Nextflow docs](https://www.nextflow.io/docs/latest/process.html#publishdir) for details.",
                     "fa_icon": "fas fa-copy",
-                    "enum": ["symlink", "rellink", "link", "copy", "copyNoFollow", "move"],
+                    "enum": [
+                        "symlink",
+                        "rellink",
+                        "link",
+                        "copy",
+                        "copyNoFollow",
+                        "move"
+                    ],
                     "hidden": true
                 },
                 "publish_dir_overwrite": {
@@ -168,8 +177,14 @@
             "properties": {
                 "db": {
                     "type": "string",
-                    "description": "Real path to the database used by emu",
-                    "default": "assets/databases/emu_database/"
+                    "description": "Emu database: a folder or .tar.gz with species_taxid.fasta[.gz] and taxonomy.tsv[.gz]. Savont classifies against the same database.",
+                    "default": "${projectDir}/assets/databases/emu_database"
+                },
+                "db_exclude_ids": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "FASTA header IDs to drop from the database, one per line. assets/databases/emu_database/emu2026_proposed_exclusion_ids.txt lists the references that an audit of the 2026 database proposed to exclude."
                 },
                 "seqtype": {
                     "type": "string",
@@ -203,7 +218,7 @@
                 "output_unclassified": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Output fiels for unclassified reads: 1) File containing reads that was not mapped to the database, 2) File containing reads that mapped to the database but was presumed to be not in the sample by EMU\u00b4s algorithm."
+                    "description": "Output fiels for unclassified reads: 1) File containing reads that was not mapped to the database, 2) File containing reads that mapped to the database but was presumed to be not in the sample by EMU´s algorithm."
                 },
                 "combine_levels": {
                     "type": "string",
@@ -220,7 +235,9 @@
                     "description": "Two output tables:abundances and taxonomy lineages"
                 }
             },
-            "required": ["db"]
+            "required": [
+                "db"
+            ]
         },
         "short_read_options": {
             "title": "short read options",
@@ -300,13 +317,74 @@
                 },
                 "save_merged_reads": {
                     "type": "boolean",
-                    "default": true,
-                    "description": "save merged ont reads"
+                    "default": false,
+                    "description": "Save the demultiplexed reads before human read removal"
                 },
                 "save_downsampled_reads": {
                     "type": "boolean",
                     "default": false,
                     "description": "save downsampled reads"
+                }
+            }
+        },
+        "barbell_options": {
+            "title": "Barbell options",
+            "type": "object",
+            "description": "Demultiplexing of --merge_fastq_pass runs with the marcmtk fork of barbell",
+            "properties": {
+                "skip_barbell": {
+                    "type": "boolean",
+                    "description": "Use the barcode folders from MinKNOW instead of demultiplexing with barbell"
+                },
+                "barbell_kit": {
+                    "type": "string",
+                    "default": "SQK-MAB114-24-16S",
+                    "description": "Barbell kit preset"
+                },
+                "barbell_min_score_diff": {
+                    "type": "number",
+                    "default": 0.2,
+                    "description": "Minimum score difference between the two best barcodes. Barbell's own default of 0.1 lets more reads leak into other barcodes"
+                },
+                "save_barbell_annotation": {
+                    "type": "boolean",
+                    "description": "Save barbell's per-read tables"
+                }
+            }
+        },
+        "host_removal_options": {
+            "title": "Host removal options",
+            "type": "object",
+            "description": "Human read removal with deacon",
+            "properties": {
+                "skip_host_removal": {
+                    "type": "boolean",
+                    "description": "Run without human read removal"
+                },
+                "deacon_index": {
+                    "type": "string",
+                    "description": "Deacon minimizer index, e.g. panhuman-1.k31w15.idx. Required unless --skip_host_removal is set"
+                },
+                "deacon_rel_threshold": {
+                    "type": "number",
+                    "default": 0.05,
+                    "description": "Share of a read's minimizers that must match the index for it to be removed. Deacon's own default of 0.01 removes some bacterial 16S reads"
+                },
+                "save_dehosted_reads": {
+                    "type": "boolean",
+                    "description": "Save the reads after human read removal"
+                }
+            }
+        },
+        "savont_options": {
+            "title": "Savont options",
+            "type": "object",
+            "description": "ASV calling and classification with the marcmtk fork of savont",
+            "properties": {
+                "run_savont": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Run savont on the same reads as emu. Long reads only"
                 }
             }
         },
@@ -448,6 +526,15 @@
         },
         {
             "$ref": "#/$defs/preprocessing_long_reads"
+        },
+        {
+            "$ref": "#/$defs/barbell_options"
+        },
+        {
+            "$ref": "#/$defs/host_removal_options"
+        },
+        {
+            "$ref": "#/$defs/savont_options"
         },
         {
             "$ref": "#/$defs/krona_options"

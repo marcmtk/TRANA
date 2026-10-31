@@ -1,0 +1,33 @@
+name: barbell_kit
+description: Demultiplex and trim a whole ONT run with the marcmtk fork of barbell
+keywords:
+  - demultiplex
+  - nanopore
+  - 16S
+tools:
+  - barbell:
+      description: Fast and accurate Nanopore demultiplexing
+      homepage: https://github.com/marcmtk/barbell
+input:
+  - fastq_pass:
+      type: directory
+      description: MinKNOW fastq_pass folder. All .fastq.gz files below it are read, whatever bin MinKNOW gave them
+  - barcodes_samplesheet:
+      type: file
+      description: Optional barcode,sample_id CSV. Barcodes match on their number, so barcode01 and AB01 are the same
+output:
+  - fastq_dir:
+      type: directory
+      description: One trimmed <sample>.fastq.gz per sample
+  - read_counts:
+      type: file
+      description: Reads per barcode, including barcodes outside the sample sheet, which act as blank wells
+  - samples_without_reads:
+      type: file
+      description: Sample sheet entries that barbell gave no reads
+  - annotation:
+      type: file
+      description: Per-read barbell tables, gzipped
+  - versions:
+      type: file
+      description: File containing software versions

@@ -1,0 +1,29 @@
+name: compare_classifiers
+description: Put the emu and savont calls for one sample side by side, and flag savont calls tied across genera
+keywords:
+  - comparison
+  - emu
+  - savont
+tools:
+  - compare_classifiers.py:
+      description: Local script in bin/
+input:
+  - meta:
+      type: map
+      description: Sample information
+  - emu_report:
+      type: file
+      description: emu relative abundance table
+  - savont_species:
+      type: file
+      description: savont species abundance table
+  - savont_mappings:
+      type: file
+      description: savont ASV to reference mappings
+output:
+  - comparison:
+      type: file
+      description: One row per species with both classifiers' abundances
+  - versions:
+      type: file
+      description: File containing software versions

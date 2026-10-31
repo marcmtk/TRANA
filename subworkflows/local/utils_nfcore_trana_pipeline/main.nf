@@ -8,6 +8,7 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
+include { BARBELL_KIT                } from '../../../modules/local/barbell/kit/main.nf'
 include { GENERATE_INPUT             } from '../../../modules/local/generate_input/main.nf'
 include { MERGE_BARCODES             } from '../../../modules/local/merge_barcodes/main.nf'
 include { MERGE_BARCODES_SAMPLESHEET } from '../../../modules/local/merge_barcodes_samplesheet/main.nf'
@@ -83,7 +84,16 @@ workflow PIPELINE_INITIALISATION {
     //
     // MODULE: Concatenate input read files
     //
-    if ( merge_fastq_pass && !barcodes_samplesheet ) {
+    if ( merge_fastq_pass && !params.skip_barbell ) {
+        BARBELL_KIT(merge_fastq_pass, barcodes_samplesheet ? file(barcodes_samplesheet, checkIfExists: true) : [])
+        ch_versions = ch_versions.mix(BARBELL_KIT.out.versions)
+        BARBELL_KIT.out.samples_without_reads
+            .splitText()
+            .subscribe { sample -> log.warn "barbell assigned no reads to sample ${sample.trim()}, so it won't be analysed" }
+        GENERATE_INPUT(BARBELL_KIT.out.fastq_dir).sample_sheet_merged.set{ ch_samplesheet_path }
+        ch_versions = ch_versions.mix(GENERATE_INPUT.out.versions)
+
+    } else if ( merge_fastq_pass && !barcodes_samplesheet ) {
         MERGE_BARCODES(merge_fastq_pass)
         ch_versions = ch_versions.mix(MERGE_BARCODES.out.versions)
         GENERATE_INPUT(MERGE_BARCODES.out.fastq_dir_merged).sample_sheet_merged.set{ ch_samplesheet_path }

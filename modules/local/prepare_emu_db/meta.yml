@@ -1,0 +1,29 @@
+name: prepare_emu_db
+description: Unpack an emu database, pad taxonomy.tsv for savont and optionally drop listed references
+keywords:
+  - database
+  - emu
+  - savont
+tools:
+  - prepare_emu_db.py:
+      description: Local script in bin/
+input:
+  - db:
+      type: directory
+      description: Folder or .tar.gz with species_taxid.fasta[.gz] and taxonomy.tsv[.gz]
+  - exclude_ids:
+      type: file
+      description: Optional list of FASTA header IDs to drop. Lines starting with '#' are ignored
+output:
+  - db:
+      type: directory
+      description: Database folder for emu and savont
+  - taxonomy:
+      type: file
+      description: Padded taxonomy.tsv
+  - summary:
+      type: file
+      description: Entry counts and checksums for traceability
+  - versions:
+      type: file
+      description: File containing software versions

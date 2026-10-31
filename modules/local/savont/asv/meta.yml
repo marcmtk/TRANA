@@ -1,0 +1,30 @@
+name: savont_asv
+description: Call amplicon sequence variants from long reads with the marcmtk fork of savont
+keywords:
+  - ASV
+  - amplicon
+  - 16S
+tools:
+  - savont:
+      description: Amplicon sequencing variants and taxonomic profiling from long reads
+      homepage: https://github.com/marcmtk/savont
+input:
+  - meta:
+      type: map
+      description: Sample information
+  - reads:
+      type: file
+      description: Primer- and adapter-trimmed reads
+output:
+  - asv_dir:
+      type: directory
+      description: savont output folder, the input to SAVONT_CLASSIFY
+  - fasta:
+      type: file
+      description: ASV sequences
+  - feature_table:
+      type: file
+      description: Read depth per ASV
+  - versions:
+      type: file
+      description: File containing software versions

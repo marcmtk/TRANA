@@ -27,6 +27,11 @@ include { PHYLOSEQ_OBJECT                        } from '../modules/local/phylos
 include { ASSIGNMENT_HEATMAP                     } from '../modules/local/assignment_heatmap/main.nf'
 include { CTRL_COMPARISON                        } from '../modules/local/ctrl_comparison/main.nf'
 include { TRANSLATE_TAXIDS                       } from '../modules/local/translate_taxids/main.nf'
+include { PREPARE_EMU_DB                         } from '../modules/local/prepare_emu_db/main.nf'
+include { DEACON_FILTER                          } from '../modules/nf-core/deacon/filter/main.nf'
+include { SAVONT_ASV                             } from '../modules/local/savont/asv/main.nf'
+include { SAVONT_CLASSIFY                        } from '../modules/local/savont/classify/main.nf'
+include { COMPARE_CLASSIFIERS                    } from '../modules/local/compare_classifiers/main.nf'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -48,11 +53,61 @@ workflow TRANA {
 
     summary_params = paramsSummaryMap(workflow, parameters_schema: "nextflow_schema.json")
 
+    // MODULE: Unpack the emu database into the form both emu and savont read
+    PREPARE_EMU_DB(
+        file(params.db, checkIfExists: true),
+        params.db_exclude_ids ? file(params.db_exclude_ids, checkIfExists: true) : []
+    )
+    ch_versions = ch_versions.mix(PREPARE_EMU_DB.out.versions)
+    ch_emu_db = PREPARE_EMU_DB.out.db
+
     // MODULE: Run FastQC
     FASTQC (ch_reads)
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]}.ifEmpty([]))
 
     ch_versions = ch_versions.mix(FASTQC.out.versions)
+
+    // MODULE: Remove human reads with deacon
+    if (params.skip_host_removal) {
+        ch_reads.set { ch_dehosted_reads }
+    } else {
+        if (!params.deacon_index) {
+            error "Human read removal needs --deacon_index, e.g. the panhuman-1 index from 'deacon index fetch panhuman-1'. Set --skip_host_removal to run without it."
+        }
+        DEACON_FILTER(
+            ch_reads.map { meta, reads -> [ meta, file(params.deacon_index, checkIfExists: true), reads ] }
+        )
+        ch_versions = ch_versions.mix(
+            DEACON_FILTER.out.versions_deacon
+                .first()
+                .map { process, tool, version -> "\"${process}\":\n    ${tool}: ${version}\n" }
+                .collectFile(name: 'deacon_versions.yml')
+        )
+        DEACON_FILTER.out.log
+            .map { meta, summary ->
+                def stats = new groovy.json.JsonSlurper().parse(summary)
+                [ meta.id, stats.seqs_in, stats.seqs_removed, stats.seqs_removed_proportion ].join('\t')
+            }
+            .collectFile(
+                name: 'host_removal_summary.tsv',
+                seed: 'sample\treads_in\treads_removed\tproportion_removed',
+                newLine: true,
+                sort: true,
+                storeDir: "${params.outdir}/deacon"
+            )
+
+        // Samples with nothing left can't be classified, and must not vanish unnoticed
+        DEACON_FILTER.out.fastq_filtered
+            .branch { meta, reads ->
+                passed: hasReads(reads)
+                failed: true
+            }
+            .set { ch_deacon_filtered }
+        ch_deacon_filtered.failed
+            .subscribe { meta, reads -> log.warn "No reads left in sample ${meta.id} after human read removal, so it won't be analysed" }
+        ch_deacon_filtered.passed.set { ch_dehosted_reads }
+    }
+
     if (params.seqtype in ["map-ont", "lr:hq"]) {
 
         // MODULE: Run NANOPLOT_UNPROCESSED_READS
@@ -65,7 +120,7 @@ workflow TRANA {
         // Optional adapter trimming
         if (params.adapter_trimming) {
             // MODULE: Run Porechop to trim ONT adapters
-            PORECHOP_ABI(ch_reads, [])
+            PORECHOP_ABI(ch_dehosted_reads, [])
 
             PORECHOP_ABI.out.reads.map {
                 meta, reads -> [meta + [single_end: 1], reads]
@@ -76,7 +131,7 @@ workflow TRANA {
                 PORECHOP_ABI.out.log.collect{ it[1] }
             )
         } else {
-            ch_reads.set{ ch_optionally_trimmed_reads }
+            ch_dehosted_reads.set{ ch_optionally_trimmed_reads }
         }
 
         // Optional quality filtering
@@ -88,11 +143,13 @@ workflow TRANA {
 
             // Split channels into read files with or without read content
             ch_processed_reads
-            .branch { it ->
-                passed: it[1].size() > 20
-                failed: it[1].size() <= 20
+            .branch { meta, reads ->
+                passed: hasReads(reads)
+                failed: true
             }.set { ch_processed_filtered_reads }
 
+            ch_processed_filtered_reads.failed
+                .subscribe { meta, reads -> log.warn "No reads left in sample ${meta.id} after quality filtering, so it won't be analysed" }
             ch_processed_filtered_reads.passed.set { ch_processed_passed_reads }
 
             ch_versions = ch_versions.mix(FILTLONG.out.versions.first())
@@ -107,14 +164,14 @@ workflow TRANA {
 
         // MODULE: Run cutadapt to trim short-reads adapters
         if (!params.skip_cutadapt) {
-            CUTADAPT(ch_reads)
+            CUTADAPT(ch_dehosted_reads)
             CUTADAPT.out.reads.set { ch_processed_passed_reads }
             ch_versions = ch_versions.mix(CUTADAPT.out.versions.first())
             ch_multiqc_files = ch_multiqc_files.mix(
                 CUTADAPT.out.log.collect{ it[1] }
             )
         } else {
-            ch_reads.set { ch_processed_passed_reads }
+            ch_dehosted_reads.set { ch_processed_passed_reads }
         }
     } else {
         error "Invalid seqtype. Please specify either 'map-ont', 'lr:hq' or 'sr'."
@@ -139,7 +196,7 @@ workflow TRANA {
     }
 
     // MODULE: run EMU abundance calculation
-    EMU_ABUNDANCE(ch_processed_optionally_sampled_reads)
+    EMU_ABUNDANCE(ch_processed_optionally_sampled_reads, ch_emu_db)
     ch_versions = ch_versions.mix(EMU_ABUNDANCE.out.versions)
     if (params.run_krona) {
         // MODULE: Run krona plot
@@ -152,7 +209,7 @@ workflow TRANA {
 
     // MODULE: run translate_taxids
     if (params.make_heatmap) {
-        TRANSLATE_TAXIDS(EMU_ABUNDANCE.out.assignment_report)
+        TRANSLATE_TAXIDS(EMU_ABUNDANCE.out.assignment_report, PREPARE_EMU_DB.out.taxonomy)
         ch_versions = ch_versions.mix(TRANSLATE_TAXIDS.out.versions)
 
         // Module: run assignment_heatmap
@@ -169,6 +226,32 @@ workflow TRANA {
     EMU_COMBINE_OUTPUTS(collected_files)
     ch_versions = ch_versions.mix(EMU_COMBINE_OUTPUTS.out.versions)
 
+    // MODULE: run savont on the same reads as emu
+    if (params.run_savont && params.seqtype in ["map-ont", "lr:hq"]) {
+        SAVONT_ASV(ch_processed_optionally_sampled_reads)
+        ch_versions = ch_versions.mix(SAVONT_ASV.out.versions)
+
+        SAVONT_CLASSIFY(SAVONT_ASV.out.asv_dir, ch_emu_db)
+        ch_versions = ch_versions.mix(SAVONT_CLASSIFY.out.versions)
+
+        // MODULE: put the emu and savont calls side by side
+        COMPARE_CLASSIFIERS(
+            EMU_ABUNDANCE.out.report
+                .join(SAVONT_CLASSIFY.out.species)
+                .join(SAVONT_CLASSIFY.out.mappings)
+        )
+        ch_versions = ch_versions.mix(COMPARE_CLASSIFIERS.out.versions)
+        COMPARE_CLASSIFIERS.out.comparison
+            .map { meta, comparison -> comparison }
+            .collectFile(
+                name: 'classifier_comparison.tsv',
+                keepHeader: true,
+                skip: 1,
+                sort: true,
+                storeDir: "${params.outdir}/results"
+            )
+    }
+
     // MODULE: run ctrl_comparison
     if (params.ctrl_1) {
         CTRL_COMPARISON(EMU_COMBINE_OUTPUTS.out.combined_report,EMU_COMBINE_OUTPUTS.out.combined_counts_report)
@@ -176,7 +259,6 @@ workflow TRANA {
     }
     // MODULE: Generate PHYLOSEQ object
     if (params.phyloseq) {
-        ch_tax_file = channel.fromPath("$projectDir/assets/databases/emu_database/taxonomy.tsv", checkIfExists: true)
         report_ch = EMU_ABUNDANCE.out.report
         all_reports_ch = report_ch
             .map { meta, path -> path }
@@ -185,13 +267,9 @@ workflow TRANA {
             all_reports_ch
         )
 
-        ch_tax_file = channel.fromPath(
-            "$projectDir/assets/databases/emu_database/taxonomy.tsv",
-            checkIfExists: true
-        )
         PHYLOSEQ_OBJECT (
             COMBINE_REPORTS.out.combinedreport,
-            ch_tax_file
+            PREPARE_EMU_DB.out.taxonomy
         )
 
         ch_versions = ch_versions.mix(PHYLOSEQ_OBJECT.out.versions)
@@ -256,6 +334,17 @@ workflow TRANA {
     nanostats_unprocessed   = (params.seqtype in ["map-ont", "lr:hq"]) ? NANOPLOT_UNPROCESSED_READS.out.txt : channel.empty()  // channel: [ path(master.html) ]
     nanostats_processed     = (params.seqtype in ["map-ont", "lr:hq"] && (params.quality_filtering || params.downsample_n_reads)) ? NANOPLOT_PROCESSED_READS.out.txt   : channel.empty()  // channel: [ path(master.html) ]
     multiqc_report          = multiqc_report
+}
+
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    FUNCTIONS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+// An empty gzip file is about 20 bytes
+def hasReads(reads) {
+    return [reads].flatten().every { it.size() > 20 }
 }
 
 /*

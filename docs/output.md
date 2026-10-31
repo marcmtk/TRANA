@@ -12,9 +12,57 @@ The directories listed below will be created in the results directory after the 
 
 The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes data using the following steps:
 
+- [Barbell](#barbell) - Demultiplexing and trimming
+- [Deacon](#deacon) - Human read removal
+- [Savont and classifier comparison](#savont-and-classifier-comparison) - ASVs and their classification, side by side with EMU
 - [FastQC](#fastqc) - Raw read QC
 - [MultiQC](#multiqc) - Aggregate report describing results and QC from the whole pipeline
 - [Pipeline information](#pipeline-information) - Report metrics generated during the workflow execution
+
+### Barbell
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `barbell/`
+  - `barbell_read_counts.tsv`: reads per barcode, with the sample it belongs to and a final `run_input` row with the reads in the run. Barcodes without a sample act as blank wells.
+  - `samples_without_reads.txt`: samples in the sheet that received no reads. These aren't analysed, and the pipeline also warns about them.
+  - `barbell_log.log`: barbell's log, including the patterns found.
+  - `barbell_{annotation,filtered,pattern_per_read}.tsv.gz`: per-read tables, with `--save_barbell_annotation`.
+- `fastq_pass_merged/fastq_pass_demuxed/`: reads per sample, with `--save_merged_reads`. These still contain any human reads.
+
+</details>
+
+### Deacon
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `deacon/`
+  - `host_removal_summary.tsv`: reads in and reads removed per sample.
+  - `*_dehosted.json`: deacon's summary per sample.
+  - `*_dehosted.fq.gz`: the remaining reads, with `--save_dehosted_reads`.
+
+</details>
+
+Samples with no reads left aren't analysed, and the pipeline warns about them.
+
+### Savont and classifier comparison
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `results/classifier_comparison.tsv`: one row per sample and species, with the abundance from each classifier.
+  - `detected_by`: `both`, `emu` or `savont`.
+  - `savont_tied_genera`: set when references from several genera tie at the lowest edit distance for an ASV behind that species. A pair that 16S can't separate, such as _E. coli_/_Shigella_, will show up here, but so will a mislabelled reference, so treat any other pair as unconfirmed at genus level.
+- `results/savont/`
+  - `*.species_abundance.tsv`, `*.genus_abundance.tsv`: relative abundance.
+  - `*.asv_mappings.tsv`: every reference tied at the lowest edit distance for each ASV.
+  - `*.final_asvs.fasta`, `*.feature-table.tsv`: ASV sequences and their read depth.
+  - `*_savont_asv.log`, `*_savont_classify.log`: logs.
+- `pipeline_info/emu_db_summary.tsv`: number of references and checksums of the database that was used.
+
+</details>
 
 ### FastQC
 

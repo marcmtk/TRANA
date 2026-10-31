@@ -19,6 +19,7 @@ process TRANSLATE_TAXIDS {
     //  Where applicable please provide/convert compressed files as input/output
     //               e.g. "*.fastq.gz" and NOT "*.fastq", "*.bam" and NOT "*.sam" etc.
     tuple val(meta), path(assignment_report)
+    path taxonomy
 
 
     output:
@@ -34,7 +35,7 @@ process TRANSLATE_TAXIDS {
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
     {
-    translate_taxids.py $assignment_report  "${params.db}/taxonomy.tsv" ${prefix}_read-assignment-distributions_translated.tsv
+    translate_taxids.py $assignment_report  $taxonomy ${prefix}_read-assignment-distributions_translated.tsv
     } > translate_taxids_log.log 2>&1
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

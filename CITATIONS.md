@@ -15,6 +15,12 @@ This pipeline uses code and infrastructure developed and maintained by the [nf-c
 
 ## Pipeline tools
 
+- [Barbell](https://github.com/rickbeeloo/barbell), using the fork at <https://github.com/marcmtk/barbell>
+
+- [Deacon](https://github.com/bede/deacon)
+
+- [Savont](https://github.com/bluenote-1577/savont), using the fork at <https://github.com/marcmtk/savont>
+
 - [FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/)
 
 - [MultiQC](https://pubmed.ncbi.nlm.nih.gov/27312411/)

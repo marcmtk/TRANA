@@ -1,0 +1,33 @@
+name: savont_classify
+description: Classify ASVs against a reference database with the marcmtk fork of savont
+keywords:
+  - classification
+  - taxonomy
+  - 16S
+tools:
+  - savont:
+      description: Amplicon sequencing variants and taxonomic profiling from long reads
+      homepage: https://github.com/marcmtk/savont
+input:
+  - meta:
+      type: map
+      description: Sample information
+  - asv_dir:
+      type: directory
+      description: Output folder of SAVONT_ASV
+  - db:
+      type: directory
+      description: Output folder of PREPARE_EMU_DB
+output:
+  - species:
+      type: file
+      description: Relative abundance per species
+  - genus:
+      type: file
+      description: Relative abundance per genus
+  - mappings:
+      type: file
+      description: Every reference tied at the lowest edit distance for each ASV
+  - versions:
+      type: file
+      description: File containing software versions

@@ -1,0 +1,11 @@
+[workspace]
+name = "trana"
+authors = ["Marc Trunjer Kusk Nielsen <marc@mtk.one>"]
+channels = ["conda-forge", "bioconda"]
+# passt, which rootless podman needs for networking, wants glibc 2.34
+platforms = [{ name = "linux-glibc234", platform = "linux-64", glibc = "2.34" }]
+
+[dependencies]
+nextflow = ">=25.10.4,<26"
+podman = ">=5.8.1,<6"
+passt = ">=2025_6_11.293c6f,<2026"

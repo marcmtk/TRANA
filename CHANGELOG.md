@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] (marcmtk fork)
+
+### Added
+
+- Demultiplex and trim `--merge_fastq_pass` runs with the marcmtk fork of barbell (`--skip_barbell` to opt out)
+- Remove human reads with deacon, using the nf-core module (`--deacon_index`, `--skip_host_removal`)
+- Run the marcmtk fork of savont on the same reads as EMU (`--run_savont`)
+- `results/classifier_comparison.tsv` with both classifiers' calls and cross-genus ties in savont
+- `PREPARE_EMU_DB`, which accepts a folder or `.tar.gz`, pads `taxonomy.tsv` for savont and drops references listed in `--db_exclude_ids`
+- `workstation` profile and `pixi.toml` for running with podman on one machine
+- Warnings when a sample is dropped for having no reads
+
+### Changed
+
+- The bundled database is now the 2026 EMU database
+- EMU 3.5.4 to 3.6.2
+- The database is staged as a process input rather than read from a host path
+- `--save_merged_reads` is off by default, as those reads still contain any human reads
+- Nextflow `>=25.04.0`, as the deacon module uses topic channels
+
 ## [v1.1.0]
 
 ### Changed

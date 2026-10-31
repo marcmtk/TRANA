@@ -11,3 +11,4 @@ testing/
 testing*
 *.pyc
 null/
+.pixi/

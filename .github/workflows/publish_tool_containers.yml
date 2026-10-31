@@ -1,0 +1,47 @@
+name: Publish tool containers
+
+# barbell and savont are built from the marcmtk forks, which aren't on bioconda.
+# Each image is tagged with the short commit it's built from, as set in its Dockerfile.
+on:
+  push:
+    paths:
+      - "containers/barbell/**"
+      - "containers/savont/**"
+      - ".github/workflows/publish_tool_containers.yml"
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        tool:
+          - barbell
+          - savont
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read the fork commit from the Dockerfile
+        id: commit
+        run: |
+          COMMIT=$(grep -m1 -oE 'COMMIT=[0-9a-f]{40}' containers/${{ matrix.tool }}/Dockerfile | cut -d= -f2)
+          echo "short=${COMMIT:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: containers/${{ matrix.tool }}
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/trana-${{ matrix.tool }}:${{ steps.commit.outputs.short }}

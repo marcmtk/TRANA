@@ -1,9 +1,20 @@
 # TRANA
 
-[![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A522.10.1-23aa62.svg)](https://www.nextflow.io/)
+[![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A525.04.0-23aa62.svg)](https://www.nextflow.io/)
 [![Run with conda](http://img.shields.io/badge/run%20with-conda-3EB049?labelColor=000000&logo=anaconda)](https://docs.conda.io/en/latest/)
 [![Run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
 [![Run with singularity](https://img.shields.io/badge/run%20with-singularity-1d355c.svg?labelColor=000000)](https://sylabs.io/docs/)
+
+> This is a fork of [genomic-medicine-sweden/TRANA](https://github.com/genomic-medicine-sweden/TRANA)
+> for Nanopore 16S runs made with the SQK-MAB114-24 kit. It adds the following:
+>
+> - **Demultiplexing:** `--merge_fastq_pass` runs are demultiplexed and trimmed with our
+>   [fork of barbell](https://github.com/marcmtk/barbell).
+> - **Human read removal:** every sample goes through [deacon](https://github.com/bede/deacon) first.
+> - **Second classifier:** our [fork of savont](https://github.com/marcmtk/savont) runs on the same reads as EMU.
+> - **Database:** the 2026 EMU database replaces the bundled one and is used by both classifiers.
+>
+> See [Runs with barbell, deacon and savont](#runs-with-barbell-deacon-and-savont).
 
 ## Introduction
 
@@ -60,7 +71,7 @@ Relative abundance comparison to controls
 
 ## Quick Start
 
-1. Install [Nextflow](https://www.nextflow.io/docs/latest/getstarted.html#installation) (`>=22.10.1`)
+1. Install [Nextflow](https://www.nextflow.io/docs/latest/getstarted.html#installation) (`>=25.04.0`)
 2. Install any of [Docker](https://docs.docker.com/engine/installation/),
    [Singularity](https://www.sylabs.io/guides/3.0/user-guide/) (you can follow
    [this tutorial](https://singularity-tutorial.github.io/01-installation/)),
@@ -94,7 +105,57 @@ minimap2 alignment. See [this blog post](https://mbhall88.github.io/post/minimap
 or and [these release notes](https://github.com/lh3/minimap2/releases/tag/v2.27)
 for some more info).
 
+## Runs with barbell, deacon and savont
+
+```bash
+pixi install   # Nextflow and podman; or use your own Nextflow with docker or singularity
+make install   # unpacks the Krona taxonomy
+
+pixi run nextflow run main.nf \
+  -profile podman,workstation \
+  --merge_fastq_pass /path/to/run/fastq_pass \
+  --barcodes_samplesheet sample_sheet.csv \
+  --deacon_index /path/to/panhuman-1.k31w15.idx \
+  --outdir results
+```
+
+- **`--merge_fastq_pass`:** barbell reads every `.fastq.gz` file below this folder,
+  whichever bin MinKNOW gave it. MinKNOW must not have trimmed the barcodes.
+  `--skip_barbell` keeps MinKNOW's bins, and `--input` takes reads that are already
+  demultiplexed. Either way, trim the reads first with `--adapter_trimming` or similar,
+  because untrimmed reads lose low-abundance ASVs in savont.
+- **`--barcodes_samplesheet`:** barcodes match on their number, so `barcode01` and `AB01`
+  are the same barcode. Barcodes not in the sheet aren't analysed, but their reads are
+  counted in `barbell/barbell_read_counts.tsv`, where they act as blank wells.
+- **`--barbell_min_score_diff`:** defaults to `0.2` rather than barbell's own `0.1`.
+  On a test run this stopped reads leaking into empty barcodes at a cost of 1-7% of each
+  sample's reads. `--maximize` isn't used, as some of its patterns assign a barcode
+  without checking that two hits agree.
+- **`--deacon_index`:** required. Get one with `deacon index fetch panhuman-1`, using the
+  same deacon version as the pipeline (0.15.0). `--skip_host_removal` runs without it.
+- **`--deacon_rel_threshold`:** the share of a read's minimizers that must match the index,
+  which defaults to `0.05` rather than deacon's own `0.01`. On trimmed reads from pure
+  cultures, `0.01` removed 106 of 130,932 reads, nearly all of the kind checked being
+  full-length bacterial 16S, while `0.05` removed 2. Simulated human reads at Q12 and above
+  were still all removed. Below that, removal falls off (66% at Q10), but `--quality_filtering`
+  drops most such reads anyway.
+- **`--db`:** defaults to the bundled 2026 EMU database, which no longer needs unpacking
+  by hand. Both classifiers use it.
+- **`--db_exclude_ids`:** drops references from the database. To drop the entries that an
+  audit of the 2026 database proposed to exclude, pass
+  `assets/databases/emu_database/emu2026_proposed_exclusion_ids.txt`. It is off by default:
+  the list holds 177 references, and 45 of them are the only reference for their species.
+- **Profiles:** `workstation` caps resources to 16 CPUs and 60 GB, as EMU otherwise asks for
+  72 GB. Barbell and savont need a container, so the `conda` profile only works with
+  `--skip_barbell --run_savont false`.
+
+Demultiplexed reads aren't saved by default (`--save_merged_reads`), because they still
+contain any human reads.
+
 ## Runs with Nanopore barcode directories
+
+Without `--skip_barbell`, barbell demultiplexes these runs as described above. With
+`--skip_barbell`, the examples below use the barcode folders from MinKNOW.
 
 You can run with or without a sample sheet. If no sample_sheet is used, the
 results will be named according to the barcode. If a sample sheet is used the
