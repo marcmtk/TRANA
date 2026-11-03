@@ -46,11 +46,12 @@ workflow TRANA {
     take:
     ch_samplesheet  // channel: samplesheet read in from --input
     ch_reads        // channel: reads from PIPELINE_INITIALISATION
+    ch_init_versions // channel: versions.yml from PIPELINE_INITIALISATION
     outdir
 
     main:
 
-    ch_versions = channel.empty()
+    ch_versions = ch_init_versions
     ch_multiqc_files = channel.empty()
 
     summary_params = paramsSummaryMap(workflow, parameters_schema: "nextflow_schema.json")

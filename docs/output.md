@@ -29,7 +29,6 @@ The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes d
   - `barbell_read_counts.tsv`: reads per barcode, with the sample it belongs to and a final `run_input` row with the reads in the run. Barcodes without a sample act as blank wells.
   - `samples_without_reads.txt`: samples in the sheet that received no reads. These aren't analysed, and the pipeline also warns about them.
   - `barbell_log.log`: barbell's log, including the patterns found.
-  - `versions.yml`: barbell's version and the fork commit it's built from.
   - `barbell_{annotation,filtered,pattern_per_read}.tsv.gz`: per-read tables, with `--save_barbell_annotation`.
 - `fastq_pass_merged/fastq_pass_demuxed/`: reads per sample, with `--save_merged_reads`. These still contain any human reads.
 
