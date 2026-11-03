@@ -11,6 +11,7 @@ include { methodsDescriptionText                 } from '../subworkflows/local/u
 include { GENERATE_YAML                          } from '../modules/local/generate_yaml/main.nf'
 include { GENERATE_MASTER_HTML                   } from '../modules/local/generate_master_html/main.nf'
 include { EMU_ABUNDANCE                          } from '../modules/local/emu/abundance/main.nf'
+include { EMU_CHECK_CALLS                        } from '../modules/local/emu/check_calls/main.nf'
 include { KRONA_KTIMPORTTEXT                     } from '../modules/nf-core/krona/ktimporttext/main.nf'
 include { EMU_REPORT_TO_KRONA                    } from '../modules/local/emu/report_to_krona/main.nf'
 include { CUSTOM_DUMPSOFTWAREVERSIONS            } from '../modules/nf-core/custom/dumpsoftwareversions/main.nf'
@@ -199,6 +200,25 @@ workflow TRANA {
     // MODULE: run EMU abundance calculation
     EMU_ABUNDANCE(ch_processed_optionally_sampled_reads, ch_emu_db)
     ch_versions = ch_versions.mix(EMU_ABUNDANCE.out.versions)
+
+    // MODULE: label calls without near-exact reads, which chimeric reads alone produce
+    if (params.check_emu_calls) {
+        EMU_CHECK_CALLS(
+            EMU_ABUNDANCE.out.report
+                .join(EMU_ABUNDANCE.out.assignment_report)
+                .join(EMU_ABUNDANCE.out.samfile)
+        )
+        ch_versions = ch_versions.mix(EMU_CHECK_CALLS.out.versions.first())
+        EMU_CHECK_CALLS.out.check
+            .map { meta, check -> check }
+            .collectFile(
+                name: 'emu_call_check.tsv',
+                keepHeader: true,
+                skip: 1,
+                sort: true,
+                storeDir: "${params.outdir}/results"
+            )
+    }
     if (params.run_krona) {
         // MODULE: Run krona plot
         EMU_REPORT_TO_KRONA(EMU_ABUNDANCE.out.report)

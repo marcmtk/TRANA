@@ -1,0 +1,29 @@
+name: emu_check_calls
+description: Label each emu species call confirmed or unconfirmed by the reads that match its references almost exactly, to mark calls made from chimeric reads
+keywords:
+  - emu
+  - chimera
+  - 16S
+tools:
+  - check_emu_calls.py:
+      description: Local script in bin/
+input:
+  - meta:
+      type: map
+      description: Sample information
+  - report:
+      type: file
+      description: emu relative abundance table
+  - assignments:
+      type: file
+      description: emu read assignment distributions, written with --keep-read-assignments
+  - sam:
+      type: file
+      description: emu's alignments, kept with --keep-files
+output:
+  - check:
+      type: file
+      description: One row per emu call with its assigned and near-exact reads and its status (confirmed, unconfirmed or not_assessed)
+  - versions:
+      type: file
+      description: File containing software versions

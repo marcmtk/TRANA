@@ -146,6 +146,18 @@ pixi run nextflow run main.nf \
   45 of them are the only reference for their species, so those species can't be called.
   The list only fits this database, and the pipeline stops if an ID isn't found: with another
   `--db`, give it a matching list or use `--skip_db_exclusion`.
+- **`--check_emu_calls`:** off by default. Labels each EMU call `confirmed`, `unconfirmed`
+  or `not_assessed` in `results/emu_call_check.tsv`, without changing EMU's result. A call
+  is confirmed when at least 2 of its reads match one of its own references almost exactly
+  (score at least 99% of the read length). Chimeric reads match no single reference that
+  well, so calls made only from chimeras stay unconfirmed. On the 2026-07-02 run this
+  labelled 11 of 13 unexpected calls and no expected species
+  ([evaluation](docs/evaluation/emu_chimera_step.md)). The thresholds were chosen on that
+  one run, so check them on another run with known composition before relying on them.
+  The check depends on read quality: when under 20% of the main species' reads are
+  near-exact, the sample's calls are `not_assessed`. It doesn't replace the NTC, as
+  contaminants have real reads and are confirmed. It runs EMU with `--keep-files`, which
+  leaves a SAM file of about 0.5 GB per sample in the work folder.
 - **Krona plots:** the lineage comes from the EMU report itself, so no separate Krona
   taxonomy is needed and no taxon can fall out of the plot.
 - **Profiles:** `workstation` caps resources to 16 CPUs and 60 GB, as EMU otherwise asks for

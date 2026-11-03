@@ -14,6 +14,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes d
 
 - [Barbell](#barbell) - Demultiplexing and trimming
 - [Deacon](#deacon) - Human read removal
+- [EMU call check](#emu-call-check) - Calls with and without reads that match their references almost exactly
 - [Savont and classifier comparison](#savont-and-classifier-comparison) - ASVs and their classification, side by side with EMU
 - [FastQC](#fastqc) - Raw read QC
 - [MultiQC](#multiqc) - Aggregate report describing results and QC from the whole pipeline
@@ -47,6 +48,21 @@ The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes d
 </details>
 
 Samples with no reads left aren't analysed, and the pipeline warns about them.
+
+### EMU call check
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `results/emu_call_check.tsv`: with `--check_emu_calls`, one row per sample and EMU call.
+  - `reads_assigned`: reads EMU assigns to the species with probability at least `--check_min_probability` (0.5).
+  - `near_exact_reads`: those of them whose best alignment to a reference of the species scores at least 1 - `--check_max_error` (0.99) times the read length, where score = matches - mismatches - inserted bases - deleted bases.
+  - `status`: `confirmed` with at least `--check_min_reads` (2) near-exact reads, otherwise `unconfirmed`. `not_assessed` for every call in a sample where less than `--check_min_share` (0.2) of the main species' reads are near-exact, as read quality is then too low for the check.
+  - `main_species_near_exact_share`: that share, for the call with the most assigned reads.
+
+</details>
+
+An unconfirmed call has no read that fits one of its references well. On the run used to evaluate the check, these were calls made from chimeric reads, but a species with no reference within about 1% would look the same. A confirmed call can still be a contaminant or a species that 16S can't separate from a relative, such as _E. fergusonii_ next to _E. coli_. See `docs/evaluation/emu_chimera_step.md`.
 
 ### Savont and classifier comparison
 

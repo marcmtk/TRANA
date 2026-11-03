@@ -1,7 +1,7 @@
 # Should TRANA remove chimeras before emu?
 
 Evaluation on the 2026-07-02 MAB114 run (`trana_full`, 1200–1800 bp, filtlong mean quality ≥94, emu 3.6.2 with the 2026 database, exclusion list on).
-Everything below was produced by the scripts in `/home/marc/Projects/2026-07-02/chimera_step_eval/scripts/` (local, not in this repository); tables are the `results_*.tsv` files there. No pipeline output was edited. The prototype check is copied here as `prototype_near_exact.py`; it is not wired into the pipeline.
+Everything below was produced by the scripts in `/home/marc/Projects/2026-07-02/chimera_step_eval/scripts/` (local, not in this repository); tables are the `results_*.tsv` files there. No pipeline output was edited. The recommended check is now in the pipeline as `--check_emu_calls` (off by default; `bin/check_emu_calls.py`, module `EMU_CHECK_CALLS`).
 
 ## Recommendation
 
@@ -304,10 +304,10 @@ Its counterpart is the 6% of a rare species' clean reads that the ASV-only compa
   - **Other read lengths and kits.**
   - **Savont's patched chimera filter as it will finally be merged.** I used a work-in-progress snapshot.
 - **Undetectable chimeras.** Chimeras with ≤ 4 parent differences on one side are almost never detected by any method (≤ 2% at gain 15). Between the closest pairs here (*K. pneumoniae*/*K. aerogenes* 26 sites, *S. aureus*/*S. epidermidis* 20 sites) such chimeras are common. They can only produce calls inside those species complexes.
-- **Prototype only.**
-  - `scripts/prototype_near_exact.py` isn't wired into TRANA.
-  - Wiring it in needs emu run with `--keep-files`, a new local module, and a decision on how "unconfirmed" appears in the classifier comparison and master report.
-  - The emu container has python3, and the prototype uses only the standard library.
+- **In the pipeline, but only as a separate table.** `--check_emu_calls` adds the prototype's rule as `bin/check_emu_calls.py`, together with a run-level guard: when under 20% of the main species' reads are near-exact, every call in the sample is `not_assessed`. On this run the main species' share was 0.42–0.66. The 20% cut-off follows from the quality-dependence table above but hasn't been tested on a poor run. The labels are in `results/emu_call_check.tsv` only; the classifier comparison and master report don't show them yet.
+  - Checked with a pipeline run of AB12 and the NTC from raw reads (`pipeline_check/run.sh`). Emu's counts were identical to the full run. Every label matched this evaluation: in AB12, *S. pneumoniae* is confirmed with 15 near-exact reads, and FDAARGOS_522, *S. equinus* and *S. haemolyticus* are unconfirmed. In the NTC, *C. acnes* (5) and *S. agalactiae* (4) are confirmed and *S. hominis* is unconfirmed. The check took 6 s and 28 MB for AB12.
+  - The near-exact counts of four large AB12 calls were 1–17 reads higher than in the tables above. The pipeline counts the 35 reads that score exactly 99% of their length, which the evaluation's float comparison (1 − score/L ≤ 0.01) dropped. Read by read, everything else agreed (`scripts/diag_scores.py`). Across AB05 and AB11–14 this changes no label, and no count below 5 (`scripts/boundary_effect.py`).
+  - With the check off, emu runs without `--keep-files` as before, and nothing else changes (NTC run, `pipeline_check/off`).
 - **The EM copy.** `emlib.py` reproduced emu exactly on the 5 published samples and the NTC. Its agreement on filtered input was checked once against a real emu run (AB12, uchime-filtered; see "Method used to test filters cheaply").
 
 ## How to rerun

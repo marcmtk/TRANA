@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove human reads with deacon, using the nf-core module (`--deacon_index`, `--skip_host_removal`)
 - Run the marcmtk fork of savont on the same reads as EMU (`--run_savont`)
 - `results/classifier_comparison.tsv` with both classifiers' calls and cross-genus ties in savont
+- `--check_emu_calls`, off by default, which labels EMU calls without near-exact reads as unconfirmed in `results/emu_call_check.tsv`
 - `PREPARE_EMU_DB`, which accepts a folder or `.tar.gz`, pads `taxonomy.tsv` for savont and drops the references in `--db_exclude_ids`
 - `workstation` profile and `pixi.toml` for running with podman on one machine
 - Warnings when a sample is dropped for having no reads

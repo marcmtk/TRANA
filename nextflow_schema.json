@@ -380,6 +380,37 @@
                 }
             }
         },
+        "emu_call_check_options": {
+            "title": "emu call check options",
+            "type": "object",
+            "description": "Label each emu call confirmed or unconfirmed by the reads that match its references almost exactly. Calls made from chimeric reads have none. Nothing is removed.",
+            "properties": {
+                "check_emu_calls": {
+                    "type": "boolean",
+                    "description": "Label each emu call confirmed, unconfirmed or not_assessed in results/emu_call_check.tsv. Runs emu with --keep-files, which leaves a SAM file of about 0.5 GB per sample in the work folder"
+                },
+                "check_max_error": {
+                    "type": "number",
+                    "default": 0.01,
+                    "description": "A read is near-exact if its best alignment to a reference of its species scores at least (1 - this) times its length, where score = matches - mismatches - inserted bases - deleted bases"
+                },
+                "check_min_reads": {
+                    "type": "integer",
+                    "default": 2,
+                    "description": "Near-exact reads needed to confirm a call"
+                },
+                "check_min_probability": {
+                    "type": "number",
+                    "default": 0.5,
+                    "description": "A read counts for the species emu assigns it to with at least this probability"
+                },
+                "check_min_share": {
+                    "type": "number",
+                    "default": 0.2,
+                    "description": "Below this share of near-exact reads in a sample's main species, its calls are labelled not_assessed, because read quality is too low for the check"
+                }
+            }
+        },
         "savont_options": {
             "title": "Savont options",
             "type": "object",
@@ -534,6 +565,9 @@
         },
         {
             "$ref": "#/$defs/savont_options"
+        },
+        {
+            "$ref": "#/$defs/emu_call_check_options"
         },
         {
             "$ref": "#/$defs/krona_options"
