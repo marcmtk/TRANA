@@ -18,6 +18,9 @@ input:
   - db:
       type: directory
       description: Output folder of PREPARE_EMU_DB
+  - index:
+      type: file
+      description: Output of SAVONT_INDEX
 output:
   - species:
       type: file

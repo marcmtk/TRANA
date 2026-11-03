@@ -1,0 +1,21 @@
+name: savont_index
+description: Build the minimap2 index that SAVONT_CLASSIFY loads, with the marcmtk fork of savont
+keywords:
+  - index
+  - minimap2
+  - 16S
+tools:
+  - savont:
+      description: Amplicon sequencing variants and taxonomic profiling from long reads
+      homepage: https://github.com/marcmtk/savont
+input:
+  - db:
+      type: directory
+      description: Output folder of PREPARE_EMU_DB
+output:
+  - index:
+      type: file
+      description: minimap2 index of the prepared FASTA
+  - versions:
+      type: file
+      description: File containing software versions

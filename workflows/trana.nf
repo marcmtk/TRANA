@@ -33,6 +33,7 @@ include { PREPARE_EMU_DB                         } from '../modules/local/prepar
 include { DEACON_FILTER                          } from '../modules/nf-core/deacon/filter/main.nf'
 include { SAVONT_ASV                             } from '../modules/local/savont/asv/main.nf'
 include { SAVONT_CLASSIFY                        } from '../modules/local/savont/classify/main.nf'
+include { SAVONT_INDEX                           } from '../modules/local/savont/index/main.nf'
 include { COMPARE_CLASSIFIERS                    } from '../modules/local/compare_classifiers/main.nf'
 
 /*
@@ -261,7 +262,10 @@ workflow TRANA {
         SAVONT_ASV(ch_processed_optionally_sampled_reads)
         ch_versions = ch_versions.mix(SAVONT_ASV.out.versions)
 
-        SAVONT_CLASSIFY(SAVONT_ASV.out.asv_dir, ch_emu_db)
+        SAVONT_INDEX(ch_emu_db)
+        ch_versions = ch_versions.mix(SAVONT_INDEX.out.versions)
+
+        SAVONT_CLASSIFY(SAVONT_ASV.out.asv_dir, ch_emu_db, SAVONT_INDEX.out.index)
         ch_versions = ch_versions.mix(SAVONT_CLASSIFY.out.versions)
 
         // MODULE: put the emu and savont calls side by side

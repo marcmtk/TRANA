@@ -9,6 +9,7 @@ process SAVONT_CLASSIFY {
     input:
     tuple val(meta), path(asv_dir)
     path db
+    path index
 
     output:
     tuple val(meta), path("${prefix}.species_abundance.tsv") , emit: species
@@ -27,12 +28,17 @@ process SAVONT_CLASSIFY {
     def args = task.ext.args ?: ''
     prefix = task.ext.prefix ?: "${meta.id}"
     """
+    # savont looks for its index next to the database, and the database folder stays as
+    # PREPARE_EMU_DB made it so that emu's tasks don't depend on the index.
+    mkdir savont_db
+    ln -s ../$db/.savont_db ../$db/species_taxid.fasta ../$db/taxonomy.tsv ../$index savont_db/
+
     savont classify \\
         $args \\
         --threads $task.cpus \\
         --input-dir $asv_dir \\
         --output-dir classified \\
-        --db $db \\
+        --db savont_db \\
         > ${prefix}_savont_classify.log 2>&1
 
     for table in species_abundance genus_abundance asv_mappings; do

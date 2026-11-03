@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PREPARE_EMU_DB`, which accepts a folder or `.tar.gz`, pads `taxonomy.tsv` for savont and drops the references in `--db_exclude_ids`
 - `workstation` profile and `pixi.toml` for running with podman on one machine
 - Warnings when a sample is dropped for having no reads
+- `SAVONT_INDEX`, which builds savont's index once from the prepared database, so that `SAVONT_CLASSIFY` no longer writes beside the shared database. That write could crash concurrent tasks and made `-resume` rerun emu
 
 ### Changed
 
