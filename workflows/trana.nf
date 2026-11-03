@@ -310,6 +310,17 @@ workflow TRANA {
         ch_versions = ch_versions.mix(PHYLOSEQ_OBJECT.out.versions)
     }
 
+    // MODULE: Generate master.html from reports
+
+    ch_reads
+        .map {
+            meta, reads -> meta
+        }
+        .first()
+        .set { ch_meta }
+    GENERATE_MASTER_HTML(ch_meta, ch_samplesheet, ch_emu_check_table)
+    ch_versions = ch_versions.mix(GENERATE_MASTER_HTML.out.versions)
+
     // collect tool versions.
     CUSTOM_DUMPSOFTWAREVERSIONS(
         ch_versions.unique().collectFile(name: 'collated_versions.yml')
@@ -344,17 +355,6 @@ workflow TRANA {
         []
     )
     multiqc_report = MULTIQC.out.report.toList()
-
-    // MODULE: Generate master.html from reports
-
-    ch_reads
-        .map {
-            meta, reads -> meta
-        }
-        .first()
-        .set { ch_meta }
-    GENERATE_MASTER_HTML(ch_meta, ch_samplesheet, ch_emu_check_table)
-    ch_versions = ch_versions.mix(GENERATE_MASTER_HTML.out.versions)
 
     ASSIGNMENT_HEATMAP.out.assignment_heatmap // Use last process so that GENERATE_YAML runs after everything is finished running
         .map {

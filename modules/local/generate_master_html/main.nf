@@ -16,11 +16,12 @@ process GENERATE_MASTER_HTML {
     path "versions.yml" , emit: versions
 
     script:
+    def args = task.ext.args ?: ''
+    def check = call_check ? "--call-check ${call_check}" : ''
     def prefix = meta.sequencing_run ?: "${params.trace_timestamp}"
     output = "${prefix}_master.html"
-    def check = call_check ? "--call-check ${call_check}" : ''
     """
-    generate_master_html.py --csv ${csv} --html ${params.master_template} --timestamp ${params.trace_timestamp} --output ${output} ${check}
+    generate_master_html.py --csv ${csv} --html ${params.master_template} --timestamp ${params.trace_timestamp} --output ${output} $args ${check}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

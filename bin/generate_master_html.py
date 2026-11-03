@@ -50,7 +50,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '-v', '--version',
     action='version',
-    version='%(prog)s 0.2.1'
+    version='%(prog)s 0.3.0'
     )
 parser.add_argument(
     '-c', '--csv',
@@ -72,6 +72,20 @@ parser.add_argument(
     metavar='PIPELINE_EXECUTION_TIMESTAMP',
     dest='timestamp',
     required=True
+    )
+parser.add_argument(
+    '-s', '--sections',
+    help='comma separated outputs this run produces, which the template links to',
+    metavar='SECTIONS',
+    dest='sections',
+    default=''
+    )
+parser.add_argument(
+    '-r', '--run-path',
+    help='sequencing run path to read the run date from, instead of the samplesheet path',
+    metavar='RUN_PATH',
+    dest='run_path',
+    default=''
     )
 parser.add_argument(
     '--call-check',
@@ -131,19 +145,20 @@ def summarise_call_check(call_check_tsv, sample_ids):
         })
     return summary
 
-def generate_master_html(template_html_fpath, sample_ids, seqrun_date, timestamp, call_check):
+def generate_master_html(template_html_fpath, sample_ids, seqrun_date, timestamp, sections, call_check):
     """Read the template from an HTML file."""
     with open(template_html_fpath, "r") as file:
         master_template = file.read()
     template = Template(master_template)
-    rendered_html = template.render(sample_ids=sample_ids, seqrun_date=seqrun_date, timestamp=timestamp, call_check=call_check)
+    rendered_html = template.render(sample_ids=sample_ids, seqrun_date=seqrun_date, timestamp=timestamp, sections=sections, call_check=call_check)
     return rendered_html
 
 def main():
     sample_ids = get_sample_ids(args.csv)
-    seqrun_date = find_date_in_string(args.csv, r'/(\d{8})_')
+    seqrun_date = find_date_in_string(args.run_path or args.csv, r'/(\d{8})_')
+    sections = [section for section in args.sections.split(',') if section]
     call_check = summarise_call_check(args.call_check, sample_ids) if args.call_check else None
-    rendered_html = generate_master_html(args.html, sample_ids, seqrun_date, args.timestamp, call_check)
+    rendered_html = generate_master_html(args.html, sample_ids, seqrun_date, args.timestamp, sections, call_check)
     with open(args.output, "w") as fout:
         fout.write(rendered_html)
 

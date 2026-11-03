@@ -7,7 +7,52 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
   </head>
   <body>
-    <div class="container my-5">
+    <div class="container-fluid my-5">
+      <div class="card mb-4">
+        <div class="card-header text-white bg-primary">
+          <h2 class="card-title mb-0">Run Report</h2>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-bordered table-striped mb-0">
+              <tbody>
+                <tr>
+                  <th scope="row">Results</th>
+                  <td>
+                    {% if "savont" in sections %}<a class="me-3" href="./results/classifier_comparison.tsv">Emu and savont comparison</a>{% endif %}
+                    {% if call_check is not none %}<a class="me-3" href="./results/emu_call_check.tsv">Emu call check</a>{% endif %}
+                    <a class="me-3" href="./results/emu-combined/collected_reports_dir/">Combined emu abundances</a>
+                    <a class="me-3" href="./results/emu-combined/collected_reports_counts_dir/">Combined emu counts</a>
+                    {% if "phyloseq" in sections %}<a class="me-3" href="./phyloseq/">Phyloseq object</a>{% endif %}
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">Reads</th>
+                  <td>
+                    {% if "barbell" in sections %}
+                    <a class="me-3" href="./barbell/barbell_read_counts.tsv">Reads per barcode</a>
+                    <a class="me-3" href="./barbell/samples_without_reads.txt">Samples without reads</a>
+                    <a class="me-3" href="./barbell/barbell_log.log">Barbell log</a>
+                    {% endif %}
+                    {% if "deacon" in sections %}<a class="me-3" href="./deacon/host_removal_summary.tsv">Human reads removed</a>{% endif %}
+                    <a class="me-3" href="./multiqc/multiqc_report.html">MultiQC</a>
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">Pipeline</th>
+                  <td>
+                    <a class="me-3" href="./pipeline_info/emu_db_summary.tsv">Database summary</a>
+                    <a class="me-3" href="./pipeline_info/software_versions.yml">Software versions</a>
+                    <a class="me-3" href="./pipeline_info/execution_report_{{ timestamp }}.html">Execution Report</a>
+                    <a class="me-3" href="./pipeline_info/execution_timeline_{{ timestamp }}.html">Execution Timeline</a>
+                    <a class="me-3" href="./pipeline_info/pipeline_dag_{{ timestamp }}.html">Pipeline DAG</a>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
       {% if call_check is not none %}
       <div class="card mb-4">
         <div class="card-header text-white bg-primary">
@@ -65,82 +110,64 @@
               <thead class="table-success">
                 <tr>
                   <th rowspan="2">Sample ID</th>
-                  <th colspan="1" class="text-center">Results</th>
-                  <th colspan="1" class="text-center">QC</th>
-                  <th colspan="8" class="text-center">NanoPlot</th>
-                  <th colspan="3" class="text-center">Pipeline</th>
+                  {% set emu_columns = ("krona" in sections) + ("emu_tables" in sections) + ("heatmap" in sections) %}
+                  {% if emu_columns %}<th colspan="{{ emu_columns }}" class="text-center">Emu</th>{% endif %}
+                  {% if "savont" in sections %}<th colspan="4" class="text-center">Savont</th>{% endif %}
+                  {% set read_columns = ("deacon" in sections) + ("filtlong" in sections) %}
+                  {% if read_columns %}<th colspan="{{ read_columns }}" class="text-center">Read filtering</th>{% endif %}
+                  {% if "nanoplot" in sections %}<th colspan="{{ 1 + ("nanoplot_processed" in sections) }}" class="text-center">NanoPlot</th>{% endif %}
                 </tr>
                 <tr>
-                  <th class="text-center">Krona</th>
-                  <th class="text-center">MultiQC Report</th>
-                  <th class="text-center">Report</th>
-                  <th class="text-center">Length vs Quality Scatter (Dot)</th>
-                  <th class="text-center">Length vs Quality Scatter (KDE)</th>
-                  <th class="text-center">Non-weighted Histogram</th>
-                  <th class="text-center">Non-weighted Log-transformed Histogram</th>
-                  <th class="text-center">Weighted Histogram</th>
-                  <th class="text-center">Weighted Log-transformed Histogram</th>
-                  <th class="text-center">Yield by Length</th>
-                  <th class="text-center">Execution Report</th>
-                  <th class="text-center">Execution Timeline</th>
-                  <th class="text-center">DAG</th>
+                  {% if "krona" in sections %}<th class="text-center">Krona</th>{% endif %}
+                  {% if "emu_tables" in sections %}<th class="text-center">Abundance</th>{% endif %}
+                  {% if "heatmap" in sections %}<th class="text-center">Assignment Heatmap</th>{% endif %}
+                  {% if "savont" in sections %}
+                  <th class="text-center">Species</th>
+                  <th class="text-center">Genus</th>
+                  <th class="text-center">ASV Mappings</th>
+                  <th class="text-center">ASV Sequences</th>
+                  {% endif %}
+                  {% if "deacon" in sections %}<th class="text-center">Deacon</th>{% endif %}
+                  {% if "filtlong" in sections %}<th class="text-center">Filtlong</th>{% endif %}
+                  {% if "nanoplot" in sections %}<th class="text-center">Raw Reads</th>{% endif %}
+                  {% if "nanoplot_processed" in sections %}<th class="text-center">Processed Reads</th>{% endif %}
                 </tr>
               </thead>
               <tbody>
                 {% for sample_id in sample_ids %}
                 <tr>
                   <td>{{ sample_id }}</td>
-                  <td><a href="./krona/{{ sample_id }}_krona.html">Krona</a></td>
-                  <td><a href="./multiqc/multiqc_report.html">MultiQC</a></td>
+                  {% if "krona" in sections %}<td><a href="./krona/{{ sample_id }}_krona.html">Krona</a></td>{% endif %}
+                  {% if "emu_tables" in sections %}<td><a href="./results/{{ sample_id }}_filtered.fastq_rel-abundance.tsv">Abundance</a></td>{% endif %}
+                  {% if "heatmap" in sections %}<td><a href="./results/assignment_heatmap/{{ sample_id }}_assignment_heatmap.png">Heatmap</a></td>{% endif %}
+                  {% if "savont" in sections %}
+                  <td><a href="./results/savont/{{ sample_id }}.species_abundance.tsv">Species</a></td>
+                  <td><a href="./results/savont/{{ sample_id }}.genus_abundance.tsv">Genus</a></td>
+                  <td><a href="./results/savont/{{ sample_id }}.asv_mappings.tsv">Mappings</a></td>
+                  <td><a href="./results/savont/{{ sample_id }}.final_asvs.fasta">FASTA</a></td>
+                  {% endif %}
+                  {% if "deacon" in sections %}<td><a href="./deacon/{{ sample_id }}_dehosted.json">Summary</a></td>{% endif %}
+                  {% if "filtlong" in sections %}<td><a href="./filtlong/{{ sample_id }}_filtered.log">Log</a></td>{% endif %}
+                  {% set nanoplots = [
+                    ("LengthvsQualityScatterPlot_dot", "Dot Scatter Plot"),
+                    ("LengthvsQualityScatterPlot_kde", "KDE Scatter Plot"),
+                    ("Non_weightedHistogramReadlength", "Non-weighted Histogram"),
+                    ("Non_weightedLogTransformed_HistogramReadlength", "Non-weighted Log-transformed Histogram"),
+                    ("WeightedHistogramReadlength", "Weighted Histogram"),
+                    ("WeightedLogTransformed_HistogramReadlength", "Weighted Log-transformed Histogram"),
+                    ("Yield_By_Length", "Yield by Length"),
+                  ] %}
+                  {% for stage, enabled in [("unprocessed", "nanoplot" in sections), ("processed", "nanoplot_processed" in sections)] if enabled %}
                   <td>
-                    <a
-                      href="./nanoplot_unprocessed/{{ sample_id }}_nanoplot_unprocessed_LengthvsQualityScatterPlot_dot.html"
-                      >Dot Scatter Plot</a
-                    >
+                    <a href="./nanoplot_{{ stage }}/{{ sample_id }}_nanoplot_{{ stage }}_NanoPlot-report.html">NanoPlot Report</a>
+                    <details>
+                      <summary>Plots</summary>
+                      {% for plot, label in nanoplots %}
+                      <a class="d-block" href="./nanoplot_{{ stage }}/{{ sample_id }}_nanoplot_{{ stage }}_{{ plot }}.html">{{ label }}</a>
+                      {% endfor %}
+                    </details>
                   </td>
-                  <td>
-                    <a
-                      href="./nanoplot_unprocessed/{{ sample_id }}_nanoplot_unprocessed_LengthvsQualityScatterPlot_kde.html"
-                      >KDE Scatter Plot</a
-                    >
-                  </td>
-                  <td>
-                    <a href="./nanoplot_unprocessed/{{ sample_id }}_nanoplot_unprocessed_NanoPlot-report.html"
-                      >NanoPlot Report</a
-                    >
-                  </td>
-                  <td>
-                    <a
-                      href="./nanoplot_unprocessed/{{ sample_id }}_nanoplot_unprocessed_Non_weightedHistogramReadlength.html"
-                      >Non-weighted Histogram</a
-                    >
-                  </td>
-                  <td>
-                    <a
-                      href="./nanoplot_unprocessed/{{ sample_id }}_nanoplot_unprocessed_Non_weightedLogTransformed_HistogramReadlength.html"
-                      >Non-weighted Log-transformed Histogram</a
-                    >
-                  </td>
-                  <td>
-                    <a
-                      href="./nanoplot_unprocessed/{{ sample_id }}_nanoplot_unprocessed_WeightedHistogramReadlength.html"
-                      >Weighted Histogram</a
-                    >
-                  </td>
-                  <td>
-                    <a
-                      href="./nanoplot_unprocessed/{{ sample_id }}_nanoplot_unprocessed_WeightedLogTransformed_HistogramReadlength.html"
-                      >Weighted Log-transformed Histogram</a
-                    >
-                  </td>
-                  <td>
-                    <a href="./nanoplot_unprocessed/{{ sample_id }}_nanoplot_unprocessed_Yield_By_Length.html"
-                      >Yield by Length</a
-                    >
-                  </td>
-                  <td><a href="./pipeline_info/execution_report_{{ timestamp }}.html">Execution Report</a></td>
-                  <td><a href="./pipeline_info/execution_timeline_{{ timestamp }}.html">Execution Timeline</a></td>
-                  <td><a href="./pipeline_info/pipeline_dag_{{ timestamp }}.html">Pipeline DAG</a></td>
+                  {% endfor %}
                 </tr>
                 {% endfor %}
               </tbody>
