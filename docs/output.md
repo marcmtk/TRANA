@@ -59,6 +59,8 @@ Samples with no reads left aren't analysed, and the pipeline warns about them.
   - `near_exact_reads`: those of them whose best alignment to a reference of the species scores at least 1 - `--check_max_error` (0.99) times the read length, where score = matches - mismatches - inserted bases - deleted bases.
   - `status`: `confirmed` with at least `--check_min_reads` (2) near-exact reads, otherwise `unconfirmed`. `not_assessed` for every call in a sample where less than `--check_min_share` (0.2) of the main species' reads are near-exact, as read quality is then too low for the check.
   - `main_species_near_exact_share`: that share, for the call with the most assigned reads.
+- The master report lists each sample's unconfirmed and confirmed calls, and `results/classifier_comparison.tsv` has the label in `emu_call_check`, which is empty without `--check_emu_calls`.
+- EMU's alignments stay in its work folder as `*_emu_alignments.bam`. They are only published, as SAM, with `--keep_files`.
 
 </details>
 
@@ -71,6 +73,7 @@ An unconfirmed call has no read that fits one of its references well. On the run
 
 - `results/classifier_comparison.tsv`: one row per sample and species, with the abundance from each classifier.
   - `detected_by`: `both`, `emu` or `savont`.
+  - `emu_call_check`: the label from the [EMU call check](#emu-call-check), with `--check_emu_calls`.
   - `savont_tied_genera`: set when references from several genera tie at the lowest edit distance for an ASV behind that species. A pair that 16S can't separate, such as _E. coli_/_Shigella_, will show up here, but so will a mislabelled reference, so treat any other pair as unconfirmed at genus level.
 - `results/savont/`
   - `*.species_abundance.tsv`, `*.genus_abundance.tsv`: relative abundance.

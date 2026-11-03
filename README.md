@@ -156,8 +156,10 @@ pixi run nextflow run main.nf \
   one run, so check them on another run with known composition before relying on them.
   The check depends on read quality: when under 20% of the main species' reads are
   near-exact, the sample's calls are `not_assessed`. It doesn't replace the NTC, as
-  contaminants have real reads and are confirmed. It runs EMU with `--keep-files`, which
-  leaves a SAM file of about 0.5 GB per sample in the work folder.
+  contaminants have real reads and are confirmed. The labels are also shown in the master
+  report and in `results/classifier_comparison.tsv`. The check reads EMU's alignments, so
+  EMU keeps them as a BAM file in its work folder (70 MB for a sample of 35,000 reads; the
+  SAM EMU writes is about six times larger and is removed unless `--keep_files` is set).
 - **Krona plots:** the lineage comes from the EMU report itself, so no separate Krona
   taxonomy is needed and no taxon can fall out of the plot.
 - **Profiles:** `workstation` caps resources to 16 CPUs and 60 GB, as EMU otherwise asks for

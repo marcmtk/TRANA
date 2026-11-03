@@ -17,9 +17,9 @@ input:
   - assignments:
       type: file
       description: emu read assignment distributions, written with --keep-read-assignments
-  - sam:
+  - alignments:
       type: file
-      description: emu's alignments, kept with --keep-files
+      description: emu's alignments as BAM (or SAM), kept with --keep-files
 output:
   - check:
       type: file

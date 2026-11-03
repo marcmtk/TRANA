@@ -9,7 +9,7 @@ process COMPARE_CLASSIFIERS {
         'community.wave.seqera.io/library/pandas_python:4330fd07d14e9bfb' }"
 
     input:
-    tuple val(meta), path(emu_report), path(savont_species), path(savont_mappings)
+    tuple val(meta), path(emu_report), path(savont_species), path(savont_mappings), path(emu_check)
 
     output:
     tuple val(meta), path("${prefix}.classifier_comparison.tsv") , emit: comparison
@@ -20,12 +20,14 @@ process COMPARE_CLASSIFIERS {
 
     script:
     prefix = task.ext.prefix ?: "${meta.id}"
+    def check = emu_check ? "--emu-check ${emu_check}" : ''
     """
     compare_classifiers.py \\
         --sample ${meta.id} \\
         --emu $emu_report \\
         --savont-species $savont_species \\
         --savont-mappings $savont_mappings \\
+        $check \\
         --output ${prefix}.classifier_comparison.tsv
 
     cat <<-END_VERSIONS > versions.yml

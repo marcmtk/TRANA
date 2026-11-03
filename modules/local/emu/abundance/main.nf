@@ -36,6 +36,7 @@ process EMU_ABUNDANCE {
     tuple val(meta), path("*abundance.tsv")                     , emit: report
     tuple val(meta), path("*read-assignment-distributions.tsv") , emit: assignment_report, optional:true
     tuple val(meta), path("*.sam")                              , emit: samfile, optional:true
+    tuple val(meta), path("*.bam")                              , emit: bamfile, optional:true
     tuple val(meta), path("*.fastq_unclassified_mapped.fasta")  , emit: unclassified_mapped_fa , optional:true
     tuple val(meta), path("*.fastq_unmapped.fasta")             , emit: unclassified_unmapped_fa , optional:true
     path "versions.yml"                                         , emit: versions
@@ -48,6 +49,13 @@ process EMU_ABUNDANCE {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
+    // A BAM is about a sixth of the SAM's size. The SAM is removed unless it is kept for publishing
+    def to_bam = task.ext.bam ? """
+    for sam in *.sam; do
+        python -c "import pysam, sys; pysam.view('-@', '${task.cpus}', '-b', '-o', sys.argv[2], sys.argv[1], catch_stdout=False)" "\$sam" "\${sam%.sam}.bam"
+        ${task.ext.keep_sam ? '' : 'rm "$sam"'}
+    done
+    """ : ''
     """
     {
     echo "$reads"
@@ -58,6 +66,7 @@ process EMU_ABUNDANCE {
         --threads $task.cpus \\
         $reads
     } > "${prefix}_emu_log.log" 2>&1
+    $to_bam
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -71,6 +80,7 @@ process EMU_ABUNDANCE {
     touch ${prefix}.abundance.tsv
     touch ${prefix}.read-assignment-distributions.tsv
     touch ${prefix}.sam
+    ${task.ext.bam ? "touch ${prefix}.bam" : ''}
     touch ${prefix}.fastq_unclassified_mapped.fasta
     touch ${prefix}.fastq_unmapped.fasta
     touch ${prefix}_emu_log.log

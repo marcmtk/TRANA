@@ -202,14 +202,17 @@ workflow TRANA {
     ch_versions = ch_versions.mix(EMU_ABUNDANCE.out.versions)
 
     // MODULE: label calls without near-exact reads, which chimeric reads alone produce
+    ch_emu_check = EMU_ABUNDANCE.out.report.map { meta, report -> [ meta, [] ] }
+    ch_emu_check_table = channel.value([])
     if (params.check_emu_calls) {
         EMU_CHECK_CALLS(
             EMU_ABUNDANCE.out.report
                 .join(EMU_ABUNDANCE.out.assignment_report)
-                .join(EMU_ABUNDANCE.out.samfile)
+                .join(EMU_ABUNDANCE.out.bamfile)
         )
         ch_versions = ch_versions.mix(EMU_CHECK_CALLS.out.versions.first())
-        EMU_CHECK_CALLS.out.check
+        ch_emu_check = EMU_CHECK_CALLS.out.check
+        ch_emu_check_table = EMU_CHECK_CALLS.out.check
             .map { meta, check -> check }
             .collectFile(
                 name: 'emu_call_check.tsv',
@@ -218,6 +221,7 @@ workflow TRANA {
                 sort: true,
                 storeDir: "${params.outdir}/results"
             )
+            .ifEmpty([])
     }
     if (params.run_krona) {
         // MODULE: Run krona plot
@@ -264,6 +268,7 @@ workflow TRANA {
             EMU_ABUNDANCE.out.report
                 .join(SAVONT_CLASSIFY.out.species)
                 .join(SAVONT_CLASSIFY.out.mappings)
+                .join(ch_emu_check)
         )
         ch_versions = ch_versions.mix(COMPARE_CLASSIFIERS.out.versions)
         COMPARE_CLASSIFIERS.out.comparison
@@ -343,7 +348,7 @@ workflow TRANA {
         }
         .first()
         .set { ch_meta }
-    GENERATE_MASTER_HTML(ch_meta, ch_samplesheet)
+    GENERATE_MASTER_HTML(ch_meta, ch_samplesheet, ch_emu_check_table)
     ch_versions = ch_versions.mix(GENERATE_MASTER_HTML.out.versions)
 
     ASSIGNMENT_HEATMAP.out.assignment_heatmap // Use last process so that GENERATE_YAML runs after everything is finished running

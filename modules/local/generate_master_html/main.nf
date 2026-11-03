@@ -9,6 +9,7 @@ process GENERATE_MASTER_HTML {
     input:
     val meta
     path csv
+    path call_check
 
     output:
     path output         , emit: html
@@ -17,8 +18,9 @@ process GENERATE_MASTER_HTML {
     script:
     def prefix = meta.sequencing_run ?: "${params.trace_timestamp}"
     output = "${prefix}_master.html"
+    def check = call_check ? "--call-check ${call_check}" : ''
     """
-    generate_master_html.py --csv ${csv} --html ${params.master_template} --timestamp ${params.trace_timestamp} --output ${output}
+    generate_master_html.py --csv ${csv} --html ${params.master_template} --timestamp ${params.trace_timestamp} --output ${output} ${check}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

@@ -387,7 +387,7 @@
             "properties": {
                 "check_emu_calls": {
                     "type": "boolean",
-                    "description": "Label each emu call confirmed, unconfirmed or not_assessed in results/emu_call_check.tsv. Runs emu with --keep-files, which leaves a SAM file of about 0.5 GB per sample in the work folder"
+                    "description": "Label each emu call confirmed, unconfirmed or not_assessed in results/emu_call_check.tsv. The labels are also shown in the master report and the classifier comparison. Emu's alignments are kept as a BAM file in its work folder, about 70 MB for 35,000 reads"
                 },
                 "check_max_error": {
                     "type": "number",

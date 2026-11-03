@@ -50,7 +50,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '-v', '--version',
     action='version',
-    version='%(prog)s 0.2.0'
+    version='%(prog)s 0.2.1'
     )
 parser.add_argument(
     '-c', '--csv',
@@ -72,6 +72,13 @@ parser.add_argument(
     metavar='PIPELINE_EXECUTION_TIMESTAMP',
     dest='timestamp',
     required=True
+    )
+parser.add_argument(
+    '--call-check',
+    help='emu_call_check.tsv, whose labels are shown per sample',
+    metavar='CALL_CHECK_TSV',
+    dest='call_check',
+    default=''
     )
 parser.add_argument(
     '-o', '--output',
@@ -101,18 +108,42 @@ def get_sample_ids(samplesheet_csv):
     sample_ids = df['sample'].tolist()
     return sample_ids
 
-def generate_master_html(template_html_fpath, sample_ids, seqrun_date, timestamp):
+def summarise_call_check(call_check_tsv, sample_ids):
+    """Per sample, the emu calls by label from check_emu_calls.py, in order of estimated counts."""
+    df = pd.read_csv(call_check_tsv, sep='\t', dtype={'sample': str})
+    df = df.sort_values('estimated_counts', ascending=False)
+    summary = []
+    for sample_id in sample_ids:
+        calls = df[df['sample'] == str(sample_id)]
+        by_status = {
+            status: [
+                {'species': row.species, 'reads': int(row.reads_assigned), 'near_exact': int(row.near_exact_reads)}
+                for row in calls[calls.status == status].itertuples()
+            ]
+            for status in ('confirmed', 'unconfirmed', 'not_assessed')
+        }
+        share = calls.main_species_near_exact_share.dropna()
+        summary.append({
+            'sample_id': sample_id,
+            'checked': len(calls) > 0,
+            'share': float(share.iloc[0]) if len(share) else None,
+            **by_status,
+        })
+    return summary
+
+def generate_master_html(template_html_fpath, sample_ids, seqrun_date, timestamp, call_check):
     """Read the template from an HTML file."""
     with open(template_html_fpath, "r") as file:
         master_template = file.read()
     template = Template(master_template)
-    rendered_html = template.render(sample_ids=sample_ids, seqrun_date=seqrun_date, timestamp=timestamp)
+    rendered_html = template.render(sample_ids=sample_ids, seqrun_date=seqrun_date, timestamp=timestamp, call_check=call_check)
     return rendered_html
 
 def main():
     sample_ids = get_sample_ids(args.csv)
     seqrun_date = find_date_in_string(args.csv, r'/(\d{8})_')
-    rendered_html = generate_master_html(args.html, sample_ids, seqrun_date, args.timestamp)
+    call_check = summarise_call_check(args.call_check, sample_ids) if args.call_check else None
+    rendered_html = generate_master_html(args.html, sample_ids, seqrun_date, args.timestamp, call_check)
     with open(args.output, "w") as fout:
         fout.write(rendered_html)
 

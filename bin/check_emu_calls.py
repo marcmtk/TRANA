@@ -18,11 +18,12 @@ See docs/evaluation/emu_chimera_step.md for the evaluation behind the defaults.
 
 import argparse
 import csv
-import re
 from collections import Counter
 from pathlib import Path
 
-VERSION = "0.1.0"
+import pysam
+
+VERSION = "0.2.0"
 COLUMNS = [
     "sample",
     "tax_id",
@@ -33,8 +34,8 @@ COLUMNS = [
     "status",
     "main_species_near_exact_share",
 ]
-CIGAR = re.compile(r"(\d+)([MIDNSHP=X])")
-NM = re.compile(r"\tNM:i:(\d+)")
+# pysam's CIGAR operation codes; = and X are aligned bases like M, and NM counts their mismatches
+ALIGNED, INSERTED, DELETED, SOFT_CLIP, HARD_CLIP = {0, 7, 8}, 1, 2, 4, 5
 
 
 def assigned_reads(path, min_probability):
@@ -56,21 +57,21 @@ def assigned_reads(path, min_probability):
 def best_scores(path, assigned):
     """Return each assigned read's best alignment score and length against its own species."""
     score, length = {}, {}
-    with open(path) as fin:
-        for line in fin:
-            if line.startswith("@"):
+    with pysam.AlignmentFile(str(path), check_sq=False) as alignments:
+        for aln in alignments:
+            if aln.is_unmapped:
                 continue
-            read, _flag, reference, _pos, _mapq, cigar, rest = line.split("\t", 6)
+            read = aln.query_name
             # emu's reference names start with the species tax id, e.g. 1280:emu_db:1
-            if reference == "*" or assigned.get(read) != reference.split(":")[0]:
+            if assigned.get(read) != aln.reference_name.split(":")[0]:
                 continue
             ops = Counter()
-            for n, op in CIGAR.findall(cigar):
-                ops[op] += int(n)
-            mismatches = int(NM.search(rest).group(1)) - ops["I"] - ops["D"]
-            read_score = ops["M"] - 2 * mismatches - ops["I"] - ops["D"]
+            for op, n in aln.cigartuples:
+                ops["M" if op in ALIGNED else op] += n
+            mismatches = aln.get_tag("NM") - ops[INSERTED] - ops[DELETED]
+            read_score = ops["M"] - 2 * mismatches - ops[INSERTED] - ops[DELETED]
             # secondary alignments are soft- or hard-clipped, so both count towards length
-            length[read] = max(length.get(read, 0), ops["M"] + ops["I"] + ops["S"] + ops["H"])
+            length[read] = max(length.get(read, 0), ops["M"] + ops[INSERTED] + ops[SOFT_CLIP] + ops[HARD_CLIP])
             score[read] = max(score.get(read, read_score), read_score)
     return score, length
 
@@ -116,7 +117,7 @@ def main():
     parser.add_argument("--sample", required=True)
     parser.add_argument("--report", type=Path, required=True, help="emu rel-abundance table")
     parser.add_argument("--assignments", type=Path, required=True, help="emu read-assignment-distributions table")
-    parser.add_argument("--sam", type=Path, required=True, help="emu's alignments, kept with --keep-files")
+    parser.add_argument("--alignments", type=Path, required=True, help="emu's alignments as BAM or SAM, kept with --keep-files")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--max-error", type=float, default=0.01)
     parser.add_argument("--min-reads", type=int, default=2)
@@ -128,7 +129,7 @@ def main():
     with open(args.report, newline="") as fin:
         report = list(csv.DictReader(fin, delimiter="\t"))
     assigned = assigned_reads(args.assignments, args.min_probability)
-    score, length = best_scores(args.sam, assigned)
+    score, length = best_scores(args.alignments, assigned)
     rows = check(args.sample, report, assigned, score, length, args.max_error, args.min_reads, args.min_share)
     with open(args.output, "w", newline="") as fout:
         writer = csv.DictWriter(fout, COLUMNS, delimiter="\t", lineterminator="\n")

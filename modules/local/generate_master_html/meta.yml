@@ -24,6 +24,10 @@ input:
       type: file
       description: csv file containing information regarding 16S metagenomic data
       pattern: "*.{csv}"
+  - call_check:
+      type: file
+      description: Optional emu_call_check.tsv, whose labels are shown per sample
+      pattern: "*.{tsv}"
 
 output:
   - meta:

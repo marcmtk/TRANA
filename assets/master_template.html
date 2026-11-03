@@ -8,6 +8,53 @@
   </head>
   <body>
     <div class="container my-5">
+      {% if call_check is not none %}
+      <div class="card mb-4">
+        <div class="card-header text-white bg-primary">
+          <h2 class="card-title mb-0">Emu Call Check</h2>
+        </div>
+        <div class="card-body">
+          <p>
+            A call is <strong>confirmed</strong> when at least two of its reads match one of its references almost
+            exactly. An <strong>unconfirmed</strong> call has no such reads: on the run used to evaluate the check, these
+            were calls made from chimeric reads, but a species far from every reference looks the same. Confirmed
+            calls can still be contaminants, so compare with the negative controls. Nothing is removed from the emu
+            results. Full table: <a href="./results/emu_call_check.tsv">emu_call_check.tsv</a>.
+          </p>
+          <div class="table-responsive">
+            <table class="table table-bordered table-striped mb-0">
+              <thead class="table-success">
+                <tr>
+                  <th>Sample ID</th>
+                  <th class="w-50">Unconfirmed (reads, near-exact reads)</th>
+                  <th>Confirmed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for sample in call_check %}
+                <tr>
+                  <td>{{ sample.sample_id }}</td>
+                  {% if not sample.checked %}
+                  <td colspan="2" class="text-muted">No emu calls</td>
+                  {% elif sample.not_assessed %}
+                  <td colspan="2" class="table-warning">
+                    Not assessed: too few of the main species' reads are near-exact
+                    ({{ "%.0f" | format(sample.share * 100) }}%) for the check to be reliable, which points to low read quality
+                  </td>
+                  {% else %}
+                  <td class="text-danger">
+                    {% for call in sample.unconfirmed %}<span class="d-block"><em>{{ call.species }}</em> <span class="text-nowrap">({{ call.reads }}, {{ call.near_exact }})</span></span>{% else %}<span class="text-muted">None</span>{% endfor %}
+                  </td>
+                  <td>{% for call in sample.confirmed %}<em>{{ call.species }}</em>{% if not loop.last %}, {% endif %}{% endfor %}</td>
+                  {% endif %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      {% endif %}
       <div class="card">
         <div class="card-header text-white bg-primary">
           <h2 class="card-title mb-0">Sample Report</h2>

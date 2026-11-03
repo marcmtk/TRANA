@@ -3,14 +3,14 @@ process EMU_CHECK_CALLS {
     tag "$meta.id"
     label 'process_single'
 
-    // The script needs only python's standard library, so it runs in emu's own container
+    // The script needs only python and pysam, so it runs in emu's own container
     conda 'modules/local/emu/check_calls/env.yaml'
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/emu:3.6.2--hdfd78af_0':
         'quay.io/biocontainers/emu:3.6.2--hdfd78af_0' }"
 
     input:
-    tuple val(meta), path(report), path(assignments), path(sam)
+    tuple val(meta), path(report), path(assignments), path(alignments)
 
     output:
     tuple val(meta), path("${prefix}.emu_call_check.tsv") , emit: check
@@ -27,7 +27,7 @@ process EMU_CHECK_CALLS {
         --sample ${meta.id} \\
         --report $report \\
         --assignments $assignments \\
-        --sam $sam \\
+        --alignments $alignments \\
         --output ${prefix}.emu_call_check.tsv \\
         $args
 

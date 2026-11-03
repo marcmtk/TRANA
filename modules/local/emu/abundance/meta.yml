@@ -41,6 +41,10 @@ output:
       type: file
       description: File containing alignment data
       pattern: "*{.sam}"
+  - bamfile:
+      type: file
+      description: The alignments as BAM, with task.ext.bam. The SAM is then removed unless task.ext.keep_sam is set
+      pattern: "*{.bam}"
   - unclassified_fa:
       type: file
       description: File containing reads that mapped to the database but was presumed to be not in the sample by EMU´s algorithm.
