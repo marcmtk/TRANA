@@ -35,6 +35,8 @@ include { SAVONT_ASV                             } from '../modules/local/savont
 include { SAVONT_CLASSIFY                        } from '../modules/local/savont/classify/main.nf'
 include { SAVONT_INDEX                           } from '../modules/local/savont/index/main.nf'
 include { COMPARE_CLASSIFIERS                    } from '../modules/local/compare_classifiers/main.nf'
+include { READ_BUCKETS                           } from '../modules/local/read_buckets/sample/main.nf'
+include { READ_BUCKETS_REPORT                    } from '../modules/local/read_buckets/report/main.nf'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -47,6 +49,7 @@ workflow TRANA {
     take:
     ch_samplesheet  // channel: samplesheet read in from --input
     ch_reads        // channel: reads from PIPELINE_INITIALISATION
+    ch_barbell_tables // channel: barbell's per-read tables, or [] without barbell
     ch_init_versions // channel: versions.yml from PIPELINE_INITIALISATION
     outdir
 
@@ -54,6 +57,12 @@ workflow TRANA {
 
     ch_versions = ch_init_versions
     ch_multiqc_files = channel.empty()
+    // each sample's reads at every stage, for the read bucket report
+    ch_rb_dehosted = channel.empty()
+    ch_rb_filtered = channel.empty()
+    ch_rb_sampled = channel.empty()
+    ch_rb_asvs = channel.empty()
+    ch_rb_asv_mappings = channel.empty()
 
     summary_params = paramsSummaryMap(workflow, parameters_schema: "nextflow_schema.json")
 
@@ -81,6 +90,7 @@ workflow TRANA {
         DEACON_FILTER(
             ch_reads.map { meta, reads -> [ meta, file(params.deacon_index, checkIfExists: true), reads ] }
         )
+        ch_rb_dehosted = DEACON_FILTER.out.fastq_filtered
         ch_versions = ch_versions.mix(
             DEACON_FILTER.out.versions_deacon
                 .first()
@@ -144,6 +154,7 @@ workflow TRANA {
             FILTLONG(ch_optionally_trimmed_reads.map {
                 meta, reads -> [meta, [], reads]
             }).reads.set { ch_processed_reads }
+            ch_rb_filtered = ch_processed_reads
 
             // Split channels into read files with or without read content
             ch_processed_reads
@@ -187,6 +198,7 @@ workflow TRANA {
             ch_processed_passed_reads.map { meta, reads -> tuple(meta, reads, params.downsample_n_reads) }
             ).reads.set { ch_processed_optionally_sampled_reads }
         ch_versions = ch_versions.mix(SEQTK_SAMPLE.out.versions)
+        ch_rb_sampled = ch_processed_optionally_sampled_reads
     } else {
         ch_processed_passed_reads.set{ ch_processed_optionally_sampled_reads }
     }
@@ -267,6 +279,8 @@ workflow TRANA {
 
         SAVONT_CLASSIFY(SAVONT_ASV.out.asv_dir, ch_emu_db, SAVONT_INDEX.out.index)
         ch_versions = ch_versions.mix(SAVONT_CLASSIFY.out.versions)
+        ch_rb_asvs = SAVONT_ASV.out.fasta
+        ch_rb_asv_mappings = SAVONT_CLASSIFY.out.mappings
 
         // MODULE: put the emu and savont calls side by side
         COMPARE_CLASSIFIERS(
@@ -285,6 +299,41 @@ workflow TRANA {
                 sort: true,
                 storeDir: "${params.outdir}/results"
             )
+    }
+
+    // MODULE: follow every read through the run and name its structure
+    if (!params.skip_read_buckets && params.seqtype in ["map-ont", "lr:hq"]) {
+        def by_id = { ch -> ch.map { meta, f -> [ meta.id, f ] } }
+        ch_reads
+            .map { meta, reads -> [ meta.id, meta, reads ] }
+            .join(by_id(ch_rb_dehosted), remainder: true)
+            .join(by_id(ch_rb_filtered), remainder: true)
+            .join(by_id(ch_rb_sampled), remainder: true)
+            .join(by_id(EMU_ABUNDANCE.out.report), remainder: true)
+            .join(by_id(EMU_ABUNDANCE.out.assignment_report), remainder: true)
+            .join(by_id(ch_rb_asvs), remainder: true)
+            .join(by_id(ch_rb_asv_mappings), remainder: true)
+            .filter { it[1] != null }
+            .map { id, meta, reads, dehosted, filtered, sampled, report, assignments, asvs, asv_mappings ->
+                [ meta, reads, dehosted ?: [], filtered ?: [], sampled ?: [], report ?: [], assignments ?: [], asvs ?: [], asv_mappings ?: [] ]
+            }
+            .set { ch_read_buckets_input }
+        READ_BUCKETS(
+            ch_read_buckets_input,
+            ch_emu_db,
+            file("${projectDir}/assets/read_buckets/ecoli_16s_frame.fasta", checkIfExists: true)
+        )
+        ch_versions = ch_versions.mix(READ_BUCKETS.out.versions.first())
+
+        READ_BUCKETS_REPORT(
+            READ_BUCKETS.out.table.map { meta, table -> table }.collect(),
+            READ_BUCKETS.out.summary.map { meta, summary -> summary }.collect(),
+            ch_barbell_tables,
+            params.barcodes_samplesheet ? file(params.barcodes_samplesheet, checkIfExists: true) : [],
+            ch_emu_check_table
+        )
+        ch_versions = ch_versions.mix(READ_BUCKETS_REPORT.out.versions)
+        ch_multiqc_files = ch_multiqc_files.mix(READ_BUCKETS_REPORT.out.mqc.flatten())
     }
 
     // MODULE: run ctrl_comparison

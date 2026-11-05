@@ -45,6 +45,8 @@ workflow PIPELINE_INITIALISATION {
     main:
 
     ch_versions = channel.empty()
+    // barbell's per-read tables, for the read bucket report
+    ch_barbell_tables = channel.value([])
 
     //
     // Print version and exit if required and dump pipeline parameters to JSON file
@@ -87,6 +89,7 @@ workflow PIPELINE_INITIALISATION {
     if ( merge_fastq_pass && !params.skip_barbell ) {
         BARBELL_KIT(merge_fastq_pass, barcodes_samplesheet ? file(barcodes_samplesheet, checkIfExists: true) : [])
         ch_versions = ch_versions.mix(BARBELL_KIT.out.versions)
+        ch_barbell_tables = BARBELL_KIT.out.annotation.mix(BARBELL_KIT.out.read_counts).collect()
         BARBELL_KIT.out.samples_without_reads
             .splitText()
             .subscribe { sample -> log.warn "barbell assigned no reads to sample ${sample.trim()}, so it won't be analysed" }
@@ -130,9 +133,10 @@ workflow PIPELINE_INITIALISATION {
         .set { ch_reads }
 
     emit:
-    reads       = ch_reads            // channel: [ val(meta), [ reads ] ]
-    samplesheet = ch_samplesheet_path // channel: [ val(meta), [ samplesheet ] ]
-    versions    = ch_versions         // channel: [ versions.yml ]
+    reads          = ch_reads            // channel: [ val(meta), [ reads ] ]
+    samplesheet    = ch_samplesheet_path // channel: [ val(meta), [ samplesheet ] ]
+    barbell_tables = ch_barbell_tables   // channel: [ barbell_{annotation,filtered,pattern_per_read}.tsv.gz, barbell_read_counts.tsv ], or [] without barbell
+    versions       = ch_versions         // channel: [ versions.yml ]
 }
 
 /*

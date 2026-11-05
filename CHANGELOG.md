@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Warnings when a sample is dropped for having no reads
 - `SAVONT_INDEX`, which builds savont's index once from the prepared database, so that `SAVONT_CLASSIFY` no longer writes beside the shared database. That write could crash concurrent tasks and made `-resume` rerun emu
 - The master report links run-level results, savont, deacon, barbell, filtlong and the processed NanoPlot reports, showing only what the run produced
+- A read bucket report (`read_buckets/read_buckets.html`) that follows every read through barbell, deacon, filtlong and EMU, names each read's structure on 16S (full length, truncated, fold-back, repeat, chimera) with barbell's MAB 16S kit, and shows what the reads behind each EMU call are made of. Optional `sample_type` and `expected` columns in the barcodes sample sheet group the samples and mark calls as expected or not. `--skip_read_buckets` turns it off
 
 ### Changed
 

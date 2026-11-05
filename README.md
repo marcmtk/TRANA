@@ -123,6 +123,18 @@ pixi run nextflow run main.nf \
 - **`--barcodes_samplesheet`:** barcodes match on their number, so `barcode01` and `AB01`
   are the same barcode. Barcodes not in the sheet aren't analysed, but their reads are
   counted in `barbell/barbell_read_counts.tsv`, where they act as blank wells.
+  Two optional columns feed the [read bucket report](docs/output.md#read-buckets):
+  `sample_type` (`culture`, `mix`, `control` or `clinical`) groups the samples, and
+  `expected` lists the species a sample should contain, separated by `;` (a genus alone
+  matches any of its species), so that each EMU call is marked expected or not.
+
+  ```csv
+  barcode,sample_id,sample_type,expected
+  barcode01,AB01,culture,Klebsiella pneumoniae
+  barcode07,AB07,mix,Enterococcus faecalis;Streptococcus pasteurianus
+  barcode15,AB15_NTC,control,
+  ```
+
 - **`--barbell_min_score_diff`:** defaults to `0.2` rather than barbell's own `0.1`.
   On a test run this stopped reads leaking into empty barcodes at a cost of 1-7% of each
   sample's reads. `--maximize` isn't used, as some of its patterns assign a barcode

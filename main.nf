@@ -36,6 +36,7 @@ workflow GMS_TRANA {
     take:
     samplesheet // channel: samplesheet read in from --input
     reads
+    barbell_tables // channel: barbell's per-read tables, or [] without barbell
     versions    // channel: versions.yml from PIPELINE_INITIALISATION
     outdir
 
@@ -43,7 +44,7 @@ workflow GMS_TRANA {
     //
     // WORKFLOW: Run pipeline
     //
-    TRANA (samplesheet, reads, versions, outdir)
+    TRANA (samplesheet, reads, barbell_tables, versions, outdir)
 
     emit:
     nanostats_unprocessed   = TRANA.out.nanostats_unprocessed  // channel: /path/to/nanostats.txt
@@ -85,6 +86,7 @@ workflow {
     GMS_TRANA (
         PIPELINE_INITIALISATION.out.samplesheet,
         PIPELINE_INITIALISATION.out.reads,
+        PIPELINE_INITIALISATION.out.barbell_tables,
         PIPELINE_INITIALISATION.out.versions,
         params.outdir
     )

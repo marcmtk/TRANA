@@ -423,6 +423,18 @@
                 }
             }
         },
+        "read_bucket_options": {
+            "title": "Read bucket report",
+            "type": "object",
+            "description": "Where every read goes, and what the reads behind each emu call are made of",
+            "properties": {
+                "skip_read_buckets": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Skip the read bucket report. Long reads only. Read structure and chimeras need barbell with the SQK-MAB114-24-16S kit"
+                }
+            }
+        },
         "krona_options": {
             "title": "krona options",
             "type": "object",
@@ -565,6 +577,9 @@
         },
         {
             "$ref": "#/$defs/savont_options"
+        },
+        {
+            "$ref": "#/$defs/read_bucket_options"
         },
         {
             "$ref": "#/$defs/emu_call_check_options"
