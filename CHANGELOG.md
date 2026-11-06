@@ -33,6 +33,7 @@ Version 2.0.0 of the marcmtk hard fork, based on genomic-medicine-sweden/TRANA v
 - `--save_merged_reads` is off by default, as those reads still contain any human reads
 - Nextflow `>=25.04.0`, as the deacon module uses topic channels
 - The pipeline is now `marcmtk/TRANA` 2.0.0, a hard fork maintained separately from genomic-medicine-sweden/TRANA. CI runs on the fork, without conda since barbell and savont aren't on bioconda, and the tool images are pinned by digest
+- The pipeline stops if `--outdir` already holds results, because files already there are not overwritten and a second run would leave the first run's files next to its report. To resume, give `-resume` a new `--outdir`
 
 ## [v1.1.0]
 

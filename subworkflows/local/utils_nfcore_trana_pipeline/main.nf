@@ -48,6 +48,11 @@ workflow PIPELINE_INITIALISATION {
     // barbell's per-read tables, for the read bucket report
     ch_barbell_tables = channel.value([])
 
+    // Every run gets its own output folder, so that no result is left over from another run
+    if (!version) {
+        checkOutdirIsEmpty(outdir)
+    }
+
     //
     // Print version and exit if required and dump pipeline parameters to JSON file
     //
@@ -187,6 +192,24 @@ workflow PIPELINE_COMPLETION {
 */
 
 //
+// Stop if outdir already holds results. Nextflow doesn't overwrite published files that
+// already exist, so a second run there would leave the first run's files next to the new
+// report. The trace file of this run, which Nextflow opens before the pipeline starts, is ignored.
+def checkOutdirIsEmpty(outdir) {
+    def dir = file(outdir)
+    if (!dir.exists()) {
+        return
+    }
+    def own_files = { f -> f.name.contains(params.trace_timestamp) }
+    def leftovers = dir.listFiles().findAll { f ->
+        !(f.name == 'pipeline_info' && f.isDirectory() && f.listFiles().every(own_files))
+    }
+    if (leftovers) {
+        error "--outdir ${outdir} already holds results (${leftovers*.name.sort().take(5).join(', ')}${leftovers.size() > 5 ? ', ...' : ''}). " +
+            "Give every run a new --outdir. To resume a run, keep -resume and give a new --outdir: cached tasks publish their results there again."
+    }
+}
+
 // Validate channels from input samplesheet
 //
 def validateInputSamplesheet(input) {

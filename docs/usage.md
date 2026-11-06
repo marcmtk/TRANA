@@ -122,6 +122,8 @@ Specify this when restarting a pipeline. Nextflow will use cached results from a
 
 You can also supply a run name to resume a specific run: `-resume [run-name]`. Use the `nextflow log` command to show previous run names.
 
+The pipeline stops if `--outdir` already holds results, because Nextflow doesn't overwrite files that are already there and a second run would leave the first run's files next to its own report. So give a resumed run a new `--outdir` too: cached tasks publish their results there again.
+
 ### `-c`
 
 Specify the path to a specific config file (this is a core Nextflow command).
