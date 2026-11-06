@@ -13,6 +13,9 @@ Nothing is removed and emu's abundances are untouched. The share of near-exact r
 falls steeply with read quality, so when fewer than --min-share of the main species'
 reads are near-exact, the calls are labelled not_assessed instead.
 
+The thresholds were chosen on one run and haven't been checked on another with known
+composition, so every row says calibration = uncalibrated until that is done.
+
 See docs/evaluation/emu_chimera_step.md for the evaluation behind the defaults.
 """
 
@@ -23,7 +26,7 @@ from pathlib import Path
 
 import pysam
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 COLUMNS = [
     "sample",
     "tax_id",
@@ -32,8 +35,10 @@ COLUMNS = [
     "reads_assigned",
     "near_exact_reads",
     "status",
+    "calibration",
     "main_species_near_exact_share",
 ]
+CALIBRATION = "uncalibrated"
 # pysam's CIGAR operation codes; = and X are aligned bases like M, and NM counts their mismatches
 ALIGNED, INSERTED, DELETED, SOFT_CLIP, HARD_CLIP = {0, 7, 8}, 1, 2, 4, 5
 
@@ -107,6 +112,7 @@ def check(sample, report, assigned, score, length, max_error, min_reads, min_sha
             "reads_assigned": n_assigned[row["tax_id"]],
             "near_exact_reads": near,
             "status": status,
+            "calibration": CALIBRATION,
             "main_species_near_exact_share": f"{share:.3f}" if share != "" else "",
         })
     return rows

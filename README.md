@@ -167,7 +167,8 @@ pixi run nextflow run main.nf \
   well, so calls made only from chimeras stay unconfirmed. On the 2026-07-02 run this
   labelled 11 of 13 unexpected calls and no expected species
   ([evaluation](docs/evaluation/emu_chimera_step.md)). The thresholds were chosen on that
-  one run, so check them on another run with known composition before relying on them.
+  one run, so every label is marked `uncalibrated` until they have been checked on another
+  run with known composition.
   The check depends on read quality: when under 20% of the main species' reads are
   near-exact, the sample's calls are `not_assessed`. It doesn't replace the NTC, as
   contaminants have real reads and are confirmed. The labels are also shown in the master

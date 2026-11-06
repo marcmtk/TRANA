@@ -18,7 +18,7 @@ import re
 import statistics
 from html import escape as esc
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 BUCKET_ORDER = ["full", "truncated", "foldback", "repeat", "tail", "chimera", "switch", "colinear", "poorfit", "unaligned"]
 BUCKET_LABEL = {
@@ -610,8 +610,8 @@ def main():
         kv.append((pct(chim, n_emu), "of the reads emu sees are chimeric"))
     w('<div class="kv">' + "".join(f"<div><b>{x}</b><span>{y}</span></div>" for x, y in kv) + "</div>")
     if structure:
-        w('<div class="note">The chimera call and the read structure come from one calibration, on the 2026-07-02 run (pure cultures as negatives, reads of two cultures spliced together as positives). '
-          'Treat the rates as descriptive until a second run confirms them. Calls between closely related species (two staphylococci, two klebsiellae) are under-counted.</div>')
+        w('<div class="note"><b>Uncalibrated.</b> The chimera call and the read structure use thresholds chosen on one run, 2026-07-02 (pure cultures as negatives, reads of two cultures spliced together as positives), '
+          'and haven\'t been checked on another run with known composition. Treat the rates as descriptive. Calls between closely related species (two staphylococci, two klebsiellae) are under-counted.</div>')
 
     # ---------------------------------------------------------------- flow
     w("<h2>Where the reads go</h2>")
@@ -801,7 +801,7 @@ def main():
                 w('<p class="cap">Where fold-backs turn, all lengths. A turn at the far end of the amplicon reads one strand and then the other.</p>')
 
         # chimeras
-        w("<h2>Chimeras</h2>")
+        w("<h2>Chimeras (uncalibrated)</h2>")
         thr = S[order[0]]["thresholds"]
         para(f"A read is chimeric when two species with one breakpoint explain it by at least {thr['min_gain']} score units more than the best single species does, "
              f"each side gains at least {thr['min_side']}, and the pair fits at least {thr['min_fit']} per base. Score: +1 per matching base, −1 per mismatch, inserted or deleted base. "
@@ -938,7 +938,7 @@ def main():
     if structure:
         with open("read_buckets_structure_mqc.tsv", "w") as o:
             cols = [b for b in BUCKET_ORDER if any(T["bucket_emu"][s][b] for s in order)]
-            o.write("# id: 'read_buckets_structure'\n# section_name: 'Read structure'\n# description: 'What the reads that reach emu are made of. Chimera calls are calibrated on one run only. From the read bucket report.'\n"
+            o.write("# id: 'read_buckets_structure'\n# section_name: 'Read structure'\n# description: 'What the reads that reach emu are made of. Chimera calls are uncalibrated. From the read bucket report.'\n"
                     "# plot_type: 'bargraph'\n# pconfig:\n#     id: 'read_buckets_structure_plot'\n#     title: 'Read buckets: structure of the reads emu sees'\n#     ylab: 'Reads'\n")
             o.write("Sample\t" + "\t".join(BUCKET_LABEL[b] for b in cols) + "\n")
             for s in order:

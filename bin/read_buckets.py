@@ -14,8 +14,9 @@ strand switch without overlap, or a chimera, where references of two species wit
 explain the read better than any one species does. Positions are on E. coli 16S (K-12 rrsH),
 lifted through each reference's own alignment to it.
 
-The chimera thresholds were calibrated on one run (2026-07-02): pure cultures as negatives and
-reads of two cultures spliced together as positives. See docs/output.md.
+The chimera thresholds are uncalibrated: they were chosen on one run (2026-07-02), with pure cultures
+as negatives and reads of two cultures spliced together as positives, and haven't been checked on
+another run. See docs/output.md.
 
 Output:
   <prefix>.read_buckets.tsv.gz  one row per read

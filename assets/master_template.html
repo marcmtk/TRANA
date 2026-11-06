@@ -57,7 +57,7 @@
       {% if call_check is not none %}
       <div class="card mb-4">
         <div class="card-header text-white bg-primary">
-          <h2 class="card-title mb-0">Emu Call Check</h2>
+          <h2 class="card-title mb-0">Emu Call Check <span class="badge bg-warning text-dark align-middle fs-6">Uncalibrated</span></h2>
         </div>
         <div class="card-body">
           <p>
@@ -66,6 +66,10 @@
             were calls made from chimeric reads, but a species far from every reference looks the same. Confirmed
             calls can still be contaminants, so compare with the negative controls. Nothing is removed from the emu
             results. Full table: <a href="./results/emu_call_check.tsv">emu_call_check.tsv</a>.
+          </p>
+          <p class="text-warning-emphasis">
+            <strong>Uncalibrated:</strong> the thresholds were chosen on one run (2026-07-02) and haven't been checked on
+            another run with known composition. Use the labels as a pointer, not as a result.
           </p>
           <div class="table-responsive">
             <table class="table table-bordered table-striped mb-0">
