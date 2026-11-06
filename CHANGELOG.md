@@ -5,7 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] (marcmtk fork)
+## [Unreleased]
+
+Version 2.0.0 of the marcmtk hard fork, based on genomic-medicine-sweden/TRANA v1.1.0.
 
 ### Added
 
@@ -30,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The database is staged as a process input rather than read from a host path
 - `--save_merged_reads` is off by default, as those reads still contain any human reads
 - Nextflow `>=25.04.0`, as the deacon module uses topic channels
+- The pipeline is now `marcmtk/TRANA` 2.0.0, a hard fork maintained separately from genomic-medicine-sweden/TRANA. CI runs on the fork, without conda since barbell and savont aren't on bioconda, and the tool images are pinned by digest
 
 ## [v1.1.0]
 

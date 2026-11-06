@@ -53,7 +53,7 @@ template:
   force: true
   is_nfcore: false
   name: trana
-  org: genomic-medicine-sweden
+  org: marcmtk
   outdir: .
   skip_features: null
   version: v0.1.0

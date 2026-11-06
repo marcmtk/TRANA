@@ -5,8 +5,10 @@
 [![Run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
 [![Run with singularity](https://img.shields.io/badge/run%20with-singularity-1d355c.svg?labelColor=000000)](https://sylabs.io/docs/)
 
-> This is a fork of [genomic-medicine-sweden/TRANA](https://github.com/genomic-medicine-sweden/TRANA)
-> for Nanopore 16S runs made with the SQK-MAB114-24 kit. It adds the following:
+> This is a hard fork of [genomic-medicine-sweden/TRANA](https://github.com/genomic-medicine-sweden/TRANA)
+> v1.1.0 for Nanopore 16S runs made with the SQK-MAB114-24 kit. It is maintained separately
+> and isn't meant to be merged back; bugs serious enough to matter upstream are reported there.
+> It adds the following:
 >
 > - **Demultiplexing:** `--merge_fastq_pass` runs are demultiplexed and trimmed with our
 >   [fork of barbell](https://github.com/marcmtk/barbell).

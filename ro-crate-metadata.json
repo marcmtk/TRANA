@@ -83,7 +83,7 @@
             "mainEntity": {
                 "@id": "main.nf"
             },
-            "name": "genomic-medicine-sweden/TRANA"
+            "name": "marcmtk/TRANA"
         },
         {
             "@id": "ro-crate-metadata.json",
@@ -118,15 +118,15 @@
                     "@id": "GMS"
                 }
             ],
-            "name": ["genomic-medicine-sweden/TRANA"],
+            "name": ["marcmtk/TRANA"],
             "programmingLanguage": {
                 "@id": "https://w3id.org/workflowhub/workflow-ro-crate#nextflow"
             },
             "sdPublisher": {
                 "@id": "https://github.com/genomic-medicine-sweden"
             },
-            "url": ["https://github.com/genomic-medicine-sweden/TRANA"],
-            "version": ["1.1.0"]
+            "url": ["https://github.com/marcmtk/TRANA"],
+            "version": ["2.0.0"]
         },
         {
             "@id": "https://w3id.org/workflowhub/workflow-ro-crate#nextflow",

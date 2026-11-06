@@ -17,7 +17,7 @@
                         "size": "Large",
                         "weight": "Bolder",
                         "color": "<% if (success) { %>Good<% } else { %>Attention<%} %>",
-                        "text": "https://github.com/genomic-medicine-sweden/TRANA ${version} - ${runName}",
+                        "text": "https://github.com/marcmtk/TRANA ${version} - ${runName}",
                         "wrap": true
                     },
                     {

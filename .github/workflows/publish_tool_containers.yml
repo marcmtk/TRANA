@@ -5,6 +5,13 @@ name: Publish tool containers
 # Images are public, so this only runs when started by hand.
 on:
   workflow_dispatch:
+    inputs:
+      tool:
+        description: Image to build. Rebuilding an unchanged image gives it a new digest, so build only the one that changed.
+        type: choice
+        options:
+          - savont
+          - barbell
 
 jobs:
   publish:
@@ -13,11 +20,9 @@ jobs:
       contents: read
       packages: write
     strategy:
-      fail-fast: false
       matrix:
         tool:
-          - barbell
-          - savont
+          - ${{ inputs.tool }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -36,8 +41,12 @@ jobs:
           echo "short=${COMMIT:0:7}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: containers/${{ matrix.tool }}
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/trana-${{ matrix.tool }}:${{ steps.commit.outputs.short }}
+
+      - name: Report the digest to pin
+        run: echo "ghcr.io/${{ github.repository_owner }}/trana-${{ matrix.tool }}:${{ steps.commit.outputs.short }}@${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"

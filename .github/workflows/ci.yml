@@ -22,24 +22,20 @@ jobs:
   test:
     name: Install and run self-test pipeline
     # Only run on push if this is in the main repository
-    if: "${{ github.repository_owner == 'genomic-medicine-sweden' }}"
+    if: "${{ github.repository_owner == 'marcmtk' }}"
     runs-on: ubuntu-latest
     strategy:
       matrix:
         NXF_VER:
           - "latest-everything"
+        # The barbell and savont forks aren't on bioconda, so there is no conda run
         profile:
-          - "conda"
           - "docker"
           - "singularity"
         test_name:
           - "test"
         is_master:
           - ${{ github.base_ref == 'main' }}
-        # Exclude conda and singularity on dev
-        exclude:
-          - is_master: false
-            profile: "conda"
     steps:
       - name: Check out pipeline code
         uses: actions/checkout@v3
@@ -79,7 +75,7 @@ jobs:
             -log $(pwd)/nextflow.log \
             run main.nf \
             -profile singularity,test \
-            --outdir results \
+            --outdir results_merge_fastq_pass \
             --db $(pwd)/assets/databases/emu_database \
             --seqtype map-ont \
             --merge_fastq_pass $(pwd)/assets/test_assets/ci
@@ -90,7 +86,7 @@ jobs:
             -log $(pwd)/nextflow.log \
             run main.nf \
             -profile singularity,test \
-            --outdir results \
+            --outdir results_samplesheet \
             --db $(pwd)/assets/databases/emu_database \
             --seqtype map-ont \
             --input https://raw.githubusercontent.com/genomic-medicine-sweden/test-datasets/refs/heads/16s/samplesheet.csv

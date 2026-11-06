@@ -3,7 +3,8 @@ process BARBELL_KIT {
     label 'process_high'
 
     // The fork isn't on bioconda, so there is no conda directive
-    container 'ghcr.io/marcmtk/trana-barbell:086ab1d'
+    // ghcr.io/marcmtk/trana-barbell:086ab1d, pinned by digest because the tag could be pushed again
+    container 'ghcr.io/marcmtk/trana-barbell@sha256:c0ffeb1b368e33dec0323bc8b2f5b142b8b9509fa994f4718316e65ab2e236d0'
 
     input:
     path fastq_pass

@@ -1,4 +1,4 @@
-# genomic-medicine-sweden/TRANA: Output
+# marcmtk/TRANA: Output
 
 ## Introduction
 

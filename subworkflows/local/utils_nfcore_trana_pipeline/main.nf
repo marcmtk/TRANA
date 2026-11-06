@@ -1,5 +1,5 @@
 //
-// Subworkflow with functionality specific to the genomic-medicine-sweden/TRANA pipeline
+// Subworkflow with functionality specific to the marcmtk/TRANA pipeline
 //
 
 /*
