@@ -40,6 +40,13 @@ jobs:
       - name: Check out pipeline code
         uses: actions/checkout@v3
 
+      # nf-test's Groovy can't read Java 25 class files, so pin a Java it supports
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
       - name: Install Nextflow
         # For running (locally) with ACT, we use a docker image with Nextflow pre-installed
         if: "${{ ! github.event.act }}"
