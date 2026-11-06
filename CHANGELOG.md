@@ -20,6 +20,7 @@ Version 2.0.0 of the marcmtk hard fork, based on genomic-medicine-sweden/TRANA v
 - `workstation` profile and `pixi.toml` for running with podman on one machine
 - Warnings when a sample is dropped for having no reads
 - `SAVONT_INDEX`, which builds savont's index once from the prepared database, so that `SAVONT_CLASSIFY` no longer writes beside the shared database. That write could crash concurrent tasks and made `-resume` rerun emu
+- savont's `asv_tied_classification.tsv`, which names every reference tied for an ASV, is published, linked from the master report and summarised in `classifier_comparison.tsv` (`savont_tie_level`, `savont_tied_species`)
 - The master report links run-level results, savont, deacon, barbell, filtlong and the processed NanoPlot reports, showing only what the run produced
 - A read bucket report (`read_buckets/read_buckets.html`) that follows every read through barbell, deacon, filtlong and EMU, names each read's structure on 16S (full length, truncated, fold-back, repeat, chimera) with barbell's MAB 16S kit, and shows what the reads behind each EMU call are made of. Optional `sample_type` and `expected` columns in the barcodes sample sheet group the samples and mark calls as expected or not. `--skip_read_buckets` turns it off
 
@@ -35,6 +36,7 @@ Version 2.0.0 of the marcmtk hard fork, based on genomic-medicine-sweden/TRANA v
 - The pipeline is now `marcmtk/TRANA` 2.0.0, a hard fork maintained separately from genomic-medicine-sweden/TRANA. CI runs on the fork, without conda since barbell and savont aren't on bioconda, and the tool images are pinned by digest
 - The pipeline stops if `--outdir` already holds results, because files already there are not overwritten and a second run would leave the first run's files next to its report. To resume, give `-resume` a new `--outdir`
 - The EMU call check and the read bucket report's chimera calls are marked uncalibrated, as their thresholds come from one run
+- savont from 11a4c43 (0.8.0) to f828ffd (0.8.1 with the chimera parent-similarity fix, which keeps real rRNA copies that the filter used to remove)
 
 ## [v1.1.0]
 

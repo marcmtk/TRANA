@@ -20,6 +20,9 @@ input:
   - savont_mappings:
       type: file
       description: savont ASV to reference mappings
+  - savont_tied:
+      type: file
+      description: savont's per-ASV table of tied references
   - emu_check:
       type: file
       description: Optional table from check_emu_calls.py, giving each emu call's label

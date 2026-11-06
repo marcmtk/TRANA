@@ -1,10 +1,16 @@
 #!/usr/bin/env python
 """Put the emu and savont calls for one sample side by side.
 
-savont splits an ASV between every reference tied at the lowest edit distance, so a
-mislabelled reference only has to tie with the right one to produce a wrong-genus
-call. savont_tied_genera lists the genera behind each species so those calls stand
-out. E. coli/Shigella and other pairs that 16S can't separate will also show up there.
+savont names each ASV after one reference, even when several references are equally
+close. Its asv_tied_classification.tsv names all of them, so for every species in the
+table the savont_tie_* columns say whether an ASV behind it is tied, and with what:
+savont_tie_level is none, species (several species of one genus) or cross_genus,
+savont_tied_species gives the tied names, and savont_tied_genera lists the genera when
+there is more than one. A species emu calls and savont only has inside a tie, such as
+S. agalactiae in an ASV savont names after Streptococcus sp. FDAARGOS_520, is detected_by
+emu but has the tie columns filled. E. coli/Shigella and other pairs that 16S can't
+separate show up as ties too, and so does a mislabelled reference that ties with the
+right one.
 
 With --emu-check, emu_call_check gives the label from check_emu_calls.py for each
 emu call: confirmed, unconfirmed or not_assessed.
@@ -15,7 +21,7 @@ import csv
 from collections import defaultdict
 from pathlib import Path
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 COLUMNS = [
     "sample",
     "species",
@@ -25,8 +31,12 @@ COLUMNS = [
     "emu_call_check",
     "savont_abundance",
     "detected_by",
+    "savont_tie_level",
+    "savont_tied_species",
     "savont_tied_genera",
 ]
+TIE_SEPARATOR = " / "
+TIE_LEVELS = ["none", "species", "cross_genus"]
 
 
 def read_tsv(path):
@@ -34,27 +44,38 @@ def read_tsv(path):
         return list(csv.DictReader(fin, delimiter="\t"))
 
 
-def tied_genera_per_species(mappings):
-    """Return the genera tied at the lowest edit distance in any ASV holding the species."""
-    lowest = {}
+def ties_per_species(mappings, tied):
+    """Return, per species, the tie rows of the ASVs behind it.
+
+    An ASV is behind a species if savont named it after the species, or if the species is
+    one of the names tied in it.
+    """
+    by_asv = {row["asv_header"]: row for row in tied if row["species"] != "UNCLASSIFIED"}
+    behind = defaultdict(dict)
     for row in mappings:
-        edits = int(row["number_mismatches"])
-        lowest[row["asv_header"]] = min(edits, lowest.get(row["asv_header"], edits))
-
-    asvs = defaultdict(list)
-    for row in mappings:
-        if int(row["number_mismatches"]) == lowest[row["asv_header"]]:
-            asvs[row["asv_header"]].append(row)
-
-    tied = defaultdict(set)
-    for hits in asvs.values():
-        genera = {hit["genus"] for hit in hits if hit["genus"]}
-        for hit in hits:
-            tied[hit["species"]] |= genera
-    return tied
+        if row["asv_header"] in by_asv:
+            behind[row["species"]][row["asv_header"]] = by_asv[row["asv_header"]]
+    for asv, row in by_asv.items():
+        for species in row["species"].split(TIE_SEPARATOR):
+            behind[species][asv] = row
+    return behind
 
 
-def compare(sample, emu_rows, savont_rows, mappings, check_rows=()):
+def tie_columns(rows):
+    """Summarise the tie rows of the ASVs behind one species."""
+    if not rows:
+        return {}
+    level = max((row["tie_level"] for row in rows), key=TIE_LEVELS.index)
+    names = sorted({row["species"] for row in rows if row["tie_level"] != "none"})
+    genera = sorted({genus for row in rows for genus in row["genus"].split(TIE_SEPARATOR) if genus})
+    return {
+        "savont_tie_level": level,
+        "savont_tied_species": "; ".join(names),
+        "savont_tied_genera": ",".join(genera) if len(genera) > 1 else "",
+    }
+
+
+def compare(sample, emu_rows, savont_rows, mappings, tied, check_rows=()):
     calls = {}
 
     def call(species, genus):
@@ -75,13 +96,12 @@ def compare(sample, emu_rows, savont_rows, mappings, check_rows=()):
         entry = call(row["species"], row.get("genus", ""))
         entry["savont_abundance"] = row["abundance"]
 
-    tied = tied_genera_per_species(mappings)
+    behind = ties_per_species(mappings, tied)
     for species, entry in calls.items():
         emu = "emu_abundance" in entry
         savont = "savont_abundance" in entry
         entry["detected_by"] = "both" if emu and savont else "emu" if emu else "savont"
-        genera = tied.get(species, set())
-        entry["savont_tied_genera"] = ",".join(sorted(genera)) if savont and len(genera) > 1 else ""
+        entry.update(tie_columns(list(behind.get(species, {}).values())))
 
     order = {"both": 0, "savont": 1, "emu": 2}
     return sorted(
@@ -96,13 +116,14 @@ def main():
     parser.add_argument("--emu", type=Path, required=True)
     parser.add_argument("--savont-species", type=Path, required=True)
     parser.add_argument("--savont-mappings", type=Path, required=True)
+    parser.add_argument("--savont-tied", type=Path, required=True, help="asv_tied_classification.tsv from savont classify")
     parser.add_argument("--emu-check", type=Path, help="table from check_emu_calls.py")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--version", action="version", version=f"compare_classifiers.py {VERSION}")
     args = parser.parse_args()
 
     check = read_tsv(args.emu_check) if args.emu_check else []
-    rows = compare(args.sample, read_tsv(args.emu), read_tsv(args.savont_species), read_tsv(args.savont_mappings), check)
+    rows = compare(args.sample, read_tsv(args.emu), read_tsv(args.savont_species), read_tsv(args.savont_mappings), read_tsv(args.savont_tied), check)
     with open(args.output, "w", newline="") as fout:
         writer = csv.DictWriter(fout, COLUMNS, delimiter="\t", lineterminator="\n", restval="")
         writer.writeheader()

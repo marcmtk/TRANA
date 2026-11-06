@@ -75,12 +75,14 @@ An unconfirmed call has no read that fits one of its references well. On the run
 - `results/classifier_comparison.tsv`: one row per sample and species, with the abundance from each classifier.
   - `detected_by`: `both`, `emu` or `savont`.
   - `emu_call_check`: the label from the [EMU call check](#emu-call-check), with `--check_emu_calls`.
-  - `savont_tied_genera`: set when references from several genera tie at the lowest edit distance for an ASV behind that species. A pair that 16S can't separate, such as _E. coli_/_Shigella_, will show up here, but so will a mislabelled reference, so treat any other pair as unconfirmed at genus level.
+  - `savont_tie_level`, `savont_tied_species`, `savont_tied_genera`: from savont's `asv_tied_classification.tsv`, for the ASVs behind the species. An ASV is behind a species if savont named it after the species or if the species is one of the names tied in it. `savont_tie_level` is the widest tie among them (`none`, `species` or `cross_genus`), `savont_tied_species` gives the tied names, and `savont_tied_genera` lists the genera when there is more than one. A species EMU calls but savont only has inside a tie is `detected_by` `emu` with these columns filled, so the two classifiers agree more than `detected_by` alone suggests. A pair that 16S can't separate, such as _E. coli_/_Shigella_, shows up here, but so does a mislabelled reference, so treat any other cross-genus tie as unconfirmed at genus level.
 - `results/savont/`
   - `*.species_abundance.tsv`, `*.genus_abundance.tsv`: relative abundance.
   - `*.asv_mappings.tsv`: every reference tied at the lowest edit distance for each ASV.
+  - `*.asv_tied_classification.tsv`: one row per ASV, unmapped ones included, naming all references tied at the lowest edit distance instead of one. Each rank lists every value among them, separated by ` / `, for example `Escherichia coli / Shigella flexneri`. `tie_level` is `none`, `species` (several species of one genus) or `cross_genus`; `taxon_abundance` is the total of the ASVs that share the name; `references` lists the tied reference IDs. The species and genus tables still name one reference per ASV, so read them with this table beside them.
   - `*.final_asvs.fasta`, `*.feature-table.tsv`: ASV sequences and their read depth.
   - `*_savont_asv.log`, `*_savont_classify.log`: logs.
+- A known limitation of savont's chimera filter: it only removes a chimera whose parents are under 97% similar, so chimeras between _S. aureus_ and _S. epidermidis_ remain. In the 2026-07-02 run they were 15.5% of the reads in a mix with both, without changing any species call. This is accepted.
 - `pipeline_info/emu_db_summary.tsv`: number of references and checksums of the database that was used.
 
 </details>

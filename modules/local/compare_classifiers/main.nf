@@ -9,7 +9,7 @@ process COMPARE_CLASSIFIERS {
         'community.wave.seqera.io/library/pandas_python:4330fd07d14e9bfb' }"
 
     input:
-    tuple val(meta), path(emu_report), path(savont_species), path(savont_mappings), path(emu_check)
+    tuple val(meta), path(emu_report), path(savont_species), path(savont_mappings), path(savont_tied), path(emu_check)
 
     output:
     tuple val(meta), path("${prefix}.classifier_comparison.tsv") , emit: comparison
@@ -27,6 +27,7 @@ process COMPARE_CLASSIFIERS {
         --emu $emu_report \\
         --savont-species $savont_species \\
         --savont-mappings $savont_mappings \\
+        --savont-tied $savont_tied \\
         $check \\
         --output ${prefix}.classifier_comparison.tsv
 

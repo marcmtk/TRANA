@@ -4,7 +4,8 @@ process SAVONT_CLASSIFY {
     label 'process_medium'
 
     // The fork isn't on bioconda, so there is no conda directive
-    container 'ghcr.io/marcmtk/trana-savont:11a4c43'
+    // ghcr.io/marcmtk/trana-savont:f828ffd, pinned by digest because the tag could be pushed again
+    container 'ghcr.io/marcmtk/trana-savont@sha256:174af1b032ff86c6443c9bfc99d7cae4c9bda9282d633caa547351094e434031'
 
     input:
     tuple val(meta), path(asv_dir)
@@ -15,6 +16,7 @@ process SAVONT_CLASSIFY {
     tuple val(meta), path("${prefix}.species_abundance.tsv") , emit: species
     tuple val(meta), path("${prefix}.genus_abundance.tsv")   , emit: genus
     tuple val(meta), path("${prefix}.asv_mappings.tsv")      , emit: mappings
+    tuple val(meta), path("${prefix}.asv_tied_classification.tsv"), emit: tied
     path "${prefix}_savont_classify.log"                     , emit: log
     path "versions.yml"                                      , emit: versions
 
@@ -41,7 +43,7 @@ process SAVONT_CLASSIFY {
         --db savont_db \\
         > ${prefix}_savont_classify.log 2>&1
 
-    for table in species_abundance genus_abundance asv_mappings; do
+    for table in species_abundance genus_abundance asv_mappings asv_tied_classification; do
         cp classified/\${table}.tsv ${prefix}.\${table}.tsv
     done
 
@@ -54,7 +56,7 @@ process SAVONT_CLASSIFY {
     stub:
     prefix = task.ext.prefix ?: "${meta.id}"
     """
-    touch ${prefix}.species_abundance.tsv ${prefix}.genus_abundance.tsv ${prefix}.asv_mappings.tsv ${prefix}_savont_classify.log
+    touch ${prefix}.species_abundance.tsv ${prefix}.genus_abundance.tsv ${prefix}.asv_mappings.tsv ${prefix}.asv_tied_classification.tsv ${prefix}_savont_classify.log
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

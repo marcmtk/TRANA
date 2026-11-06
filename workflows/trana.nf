@@ -287,6 +287,7 @@ workflow TRANA {
             EMU_ABUNDANCE.out.report
                 .join(SAVONT_CLASSIFY.out.species)
                 .join(SAVONT_CLASSIFY.out.mappings)
+                .join(SAVONT_CLASSIFY.out.tied)
                 .join(ch_emu_check)
         )
         ch_versions = ch_versions.mix(COMPARE_CLASSIFIERS.out.versions)

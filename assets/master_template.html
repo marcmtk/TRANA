@@ -117,7 +117,7 @@
                   <th rowspan="2">Sample ID</th>
                   {% set emu_columns = ("krona" in sections) + ("emu_tables" in sections) + ("heatmap" in sections) %}
                   {% if emu_columns %}<th colspan="{{ emu_columns }}" class="text-center">Emu</th>{% endif %}
-                  {% if "savont" in sections %}<th colspan="4" class="text-center">Savont</th>{% endif %}
+                  {% if "savont" in sections %}<th colspan="5" class="text-center">Savont</th>{% endif %}
                   {% set read_columns = ("deacon" in sections) + ("filtlong" in sections) %}
                   {% if read_columns %}<th colspan="{{ read_columns }}" class="text-center">Read filtering</th>{% endif %}
                   {% if "nanoplot" in sections %}<th colspan="{{ 1 + ("nanoplot_processed" in sections) }}" class="text-center">NanoPlot</th>{% endif %}
@@ -130,6 +130,7 @@
                   <th class="text-center">Species</th>
                   <th class="text-center">Genus</th>
                   <th class="text-center">ASV Mappings</th>
+                  <th class="text-center">Tied References</th>
                   <th class="text-center">ASV Sequences</th>
                   {% endif %}
                   {% if "deacon" in sections %}<th class="text-center">Deacon</th>{% endif %}
@@ -149,6 +150,7 @@
                   <td><a href="./results/savont/{{ sample_id }}.species_abundance.tsv">Species</a></td>
                   <td><a href="./results/savont/{{ sample_id }}.genus_abundance.tsv">Genus</a></td>
                   <td><a href="./results/savont/{{ sample_id }}.asv_mappings.tsv">Mappings</a></td>
+                  <td><a href="./results/savont/{{ sample_id }}.asv_tied_classification.tsv">Ties</a></td>
                   <td><a href="./results/savont/{{ sample_id }}.final_asvs.fasta">FASTA</a></td>
                   {% endif %}
                   {% if "deacon" in sections %}<td><a href="./deacon/{{ sample_id }}_dehosted.json">Summary</a></td>{% endif %}

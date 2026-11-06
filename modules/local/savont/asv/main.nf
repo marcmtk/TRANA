@@ -4,7 +4,8 @@ process SAVONT_ASV {
     label 'process_medium'
 
     // The fork isn't on bioconda, so there is no conda directive
-    container 'ghcr.io/marcmtk/trana-savont:11a4c43'
+    // ghcr.io/marcmtk/trana-savont:f828ffd, pinned by digest because the tag could be pushed again
+    container 'ghcr.io/marcmtk/trana-savont@sha256:174af1b032ff86c6443c9bfc99d7cae4c9bda9282d633caa547351094e434031'
 
     input:
     tuple val(meta), path(reads)
