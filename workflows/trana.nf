@@ -304,16 +304,15 @@ workflow TRANA {
 
     // MODULE: follow every read through the run and name its structure
     if (!params.skip_read_buckets && params.seqtype in ["map-ont", "lr:hq"]) {
-        def by_id = { ch -> ch.map { meta, f -> [ meta.id, f ] } }
         ch_reads
             .map { meta, reads -> [ meta.id, meta, reads ] }
-            .join(by_id(ch_rb_dehosted), remainder: true)
-            .join(by_id(ch_rb_filtered), remainder: true)
-            .join(by_id(ch_rb_sampled), remainder: true)
-            .join(by_id(EMU_ABUNDANCE.out.report), remainder: true)
-            .join(by_id(EMU_ABUNDANCE.out.assignment_report), remainder: true)
-            .join(by_id(ch_rb_asvs), remainder: true)
-            .join(by_id(ch_rb_asv_mappings), remainder: true)
+            .join(keyById(ch_rb_dehosted), remainder: true)
+            .join(keyById(ch_rb_filtered), remainder: true)
+            .join(keyById(ch_rb_sampled), remainder: true)
+            .join(keyById(EMU_ABUNDANCE.out.report), remainder: true)
+            .join(keyById(EMU_ABUNDANCE.out.assignment_report), remainder: true)
+            .join(keyById(ch_rb_asvs), remainder: true)
+            .join(keyById(ch_rb_asv_mappings), remainder: true)
             .filter { it[1] != null }
             .map { id, meta, reads, dehosted, filtered, sampled, report, assignments, asvs, asv_mappings ->
                 [ meta, reads, dehosted ?: [], filtered ?: [], sampled ?: [], report ?: [], assignments ?: [], asvs ?: [], asv_mappings ?: [] ]
@@ -437,3 +436,14 @@ def hasReads(reads) {
     THE END
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
+
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    FUNCTIONS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+// Key a [ meta, file ] channel by sample id, so that channels with differing meta maps join
+def keyById(ch) {
+    return ch.map { meta, f -> [ meta.id, f ] }
+}
