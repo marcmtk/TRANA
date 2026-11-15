@@ -1,6 +1,6 @@
 # barbell built from the marcmtk fork, which adds the SQK-MAB114-24 16S/ITS presets
 FROM rust:1.90-slim-bookworm AS build
-ARG BARBELL_COMMIT=086ab1dea26d5d3ba572fccf2fe7b6f435ec6657
+ARG BARBELL_COMMIT=2411b960f8135a937851b538e6014c8be14289b7
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates build-essential
 WORKDIR /src
 RUN git init -q . \
@@ -12,7 +12,7 @@ RUN RUSTFLAGS="-C target-cpu=x86-64-v3" cargo build --release --locked --bin bar
     && cp target/release/barbell /usr/local/bin/barbell
 
 FROM debian:bookworm-slim
-ARG BARBELL_COMMIT=086ab1dea26d5d3ba572fccf2fe7b6f435ec6657
+ARG BARBELL_COMMIT=2411b960f8135a937851b538e6014c8be14289b7
 RUN apt-get update && apt-get install -y --no-install-recommends procps && rm -rf /var/lib/apt/lists/*
 COPY --from=build /usr/local/bin/barbell /usr/local/bin/barbell
 ENV BARBELL_COMMIT=${BARBELL_COMMIT}
