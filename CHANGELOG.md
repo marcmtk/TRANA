@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- barbell from 086ab1d (0.3.3) to 2411b96 (upstream 0.4.0 merged into the fork's SQK-MAB114-24 16S/ITS presets). Upstream changed only the `barbell inspect -i` hint and CI, so demultiplexing is unchanged
+
 ## [v2.0.0] - 2026-11-06
 
 First release of the marcmtk hard fork, based on genomic-medicine-sweden/TRANA v1.1.0.
