@@ -1,5 +1,6 @@
 // Put every read of a sample in a bucket: where the pipeline dropped it, what emu made of it and,
-// with --structure, how it lies on 16S (full length, truncated, fold-back, repeat, chimera)
+// when barbell's log names a kit preset with a known amplicon, how it lies on the gene
+// (full length, truncated, fold-back, repeat, chimera)
 process READ_BUCKETS {
     tag "$meta.id"
     label 'process_low'
@@ -14,6 +15,7 @@ process READ_BUCKETS {
     tuple val(meta), path(reads, stageAs: 'input/*'), path(dehosted, stageAs: 'dehosted/*'), path(filtered, stageAs: 'filtered/*'), path(sampled, stageAs: 'sampled/*'), path(abundance, stageAs: 'emu/*'), path(assignments, stageAs: 'emu/*'), path(asvs, stageAs: 'savont/*'), path(asv_mappings, stageAs: 'savont/*')
     path db
     path frame
+    path barbell_log, stageAs: 'barbell/*'
 
     output:
     tuple val(meta), path("${prefix}.read_buckets.tsv.gz")      , emit: table
@@ -34,6 +36,7 @@ process READ_BUCKETS {
         abundance   ? "--abundance ${abundance}"     : '',
         assignments ? "--assignments ${assignments}" : '',
         asvs && asv_mappings ? "--asvs ${asvs} --asv-mappings ${asv_mappings}" : '',
+        barbell_log ? "--barbell-log ${barbell_log}" : '',
     ].findAll { it }.join(' ')
     """
     read_buckets.py \\

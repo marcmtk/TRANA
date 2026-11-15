@@ -321,7 +321,9 @@ workflow TRANA {
         READ_BUCKETS(
             ch_read_buckets_input,
             ch_emu_db,
-            file("${projectDir}/assets/read_buckets/ecoli_16s_frame.fasta", checkIfExists: true)
+            file("${projectDir}/assets/read_buckets/ecoli_16s_frame.fasta", checkIfExists: true),
+            // the kit preset barbell used, from its log, decides what the read buckets can say
+            ch_barbell_tables.map { files -> files.find { f -> f.name == 'barbell_log.log' } ?: [] }
         )
         ch_versions = ch_versions.mix(READ_BUCKETS.out.versions.first())
 

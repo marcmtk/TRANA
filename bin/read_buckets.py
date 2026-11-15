@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Put every read of one sample in a bucket: the stage that dropped it, what emu made of it, and,
-with --structure, how the read lies on 16S.
+for a barbell kit preset whose amplicon is known (KITS), how the read lies on the gene.
 
 Fate: barbell's output for the sample is followed through host removal, the length and quality
 filter, and emu. The filter rule is recomputed per read (length, and mean per-base accuracy as
@@ -14,9 +14,11 @@ strand switch without overlap, or a chimera, where references of two species wit
 explain the read better than any one species does. Positions are on E. coli 16S (K-12 rrsH),
 lifted through each reference's own alignment to it.
 
-The chimera thresholds are uncalibrated: they were chosen on one run (2026-07-02), with pure cultures
-as negatives and reads of two cultures spliced together as positives, and haven't been checked on
-another run. See docs/output.md.
+The chimera thresholds are fixed, not fitted to the run, and uncalibrated; docs/output.md says how
+they were chosen.
+
+The kit is the preset barbell names in its log ("Kit name: MAB-16S"), not the one asked for, as
+barbell resolves SQK-MAB114-24 to its 16S or ITS preset from the reads.
 
 Output:
   <prefix>.read_buckets.tsv.gz  one row per read
@@ -39,12 +41,24 @@ from multiprocessing import Pool
 
 import numpy as np
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
+
+# What is known about a barbell kit preset, keyed by the "Kit name" in barbell's log. Only presets
+# listed here get the barcode pattern groups (single-label kits: Ftag and Fflank only), and only those
+# with a gene range get the read structure. split_window is barbell's window for a second barcode
+# one amplicon after the first (src/kits/kits.rs in the barbell fork).
+KITS = {
+    "MAB-16S": dict(amplicon="16S", tag_layout="single", split_window=[1350, 1750],
+                    structure=True, gene_start=28, gene_end=1492, frame="E. coli 16S",  # 16S_mix_F/R, E. coli positions
+                    primer_trimmed=True),  # barbell trims the primer with the rear flank
+    "MAB-ITS": dict(amplicon="ITS", tag_layout="single", split_window=[350, 1150], structure=False),
+    "MAB": dict(amplicon="16S or ITS", tag_layout="single", split_window=None, structure=False),
+}
+SELECT_P = 0.5  # a read counts towards a species' references, and as one of its reads, at this assignment probability
 
 MIN_SEG = 100  # aligned query bases for a segment to count
 MIN_ARM = 100  # bases each reference must explain on its side of a breakpoint
 GRID = 5  # breakpoints tried every this many bases
-GENE_START, GENE_END = 28, 1492  # the amplicon between the 16S_mix primers, E. coli positions
 FULL_MARGIN = 100  # a read spanning the amplicon to within this on both ends is full length
 CS = re.compile(r"(:[0-9]+|\*[a-z][a-z]|[+\-][a-zA-Z]+)")
 ACC = (1 - 10 ** (-(np.arange(256) - 33) / 10.0)) * 100
@@ -73,7 +87,8 @@ def parse_args():
     p.add_argument("--frame", default="", help="E. coli 16S reference that sets the coordinates")
     p.add_argument("--asvs", default="", help="savont's final ASVs for the sample, used as references too")
     p.add_argument("--asv-mappings", default="", help="savont's asv_mappings.tsv, which names each ASV's species")
-    p.add_argument("--structure", action="store_true", help="align reads and name their structure")
+    p.add_argument("--barbell-log", default="", help="barbell's log, whose kit preset decides what the report can say")
+    p.add_argument("--kit", default="", help="the kit barbell was asked for, for the report")
     p.add_argument("--min-length", type=int, default=1200)
     p.add_argument("--max-length", type=int, default=1800)
     p.add_argument("--min-accuracy", type=float, default=94)
@@ -215,12 +230,12 @@ def choose_references(calls, assign, db, reads_path, tmp, a, asvs=()):
         for i, (key, t) in best.items():
             rename[int(i)].update(tax_id=t, species=name_of[t], named_by="closest called species")
     covered = {r["species"] for r in asvs}
-    # reads to choose with: those emu put on the species with P >= 0.5
+    # reads to choose with: those emu put on the species with P >= SELECT_P
     per = collections.Counter()
     pick = {}
     for rid, probs in assign.items():
         t, p = max(probs, key=lambda x: x[1])
-        if p >= 0.5 and t in wanted and per[t] < a.select_reads:
+        if p >= SELECT_P and t in wanted and per[t] < a.select_reads:
             per[t] += 1
             pick[rid] = t
     hits = collections.Counter()
@@ -532,7 +547,7 @@ def bucket(row, L, a):
         return "tail"
     if k == "colinear":
         return "colinear"
-    if abs(row["fend"] - row["fstart"]) >= (GENE_END - GENE_START) - 2 * FULL_MARGIN:
+    if abs(row["fend"] - row["fstart"]) >= (a.gene_end - a.gene_start) - 2 * FULL_MARGIN:
         return "full"
     return "truncated"
 
@@ -590,9 +605,31 @@ def map_structure(reads_path, refs_fa, org, frame, a):
 
 # ---------------------------------------------------------------- main
 
+def barbell_kit(path):
+    """(preset, resolved kit) from barbell's log: "Kit name: MAB-16S", and "Using kit: SQK-MAB114-24-16S"
+    when barbell resolved SQK-MAB114-24 itself. Empty strings when the log doesn't say."""
+    preset = resolved = ""
+    if path and os.path.exists(path):
+        with open(path, errors="replace") as h:
+            for line in h:
+                line = re.sub(r"\x1b\[[0-9;]*m", "", line).strip()
+                if line.startswith("Kit name:") and not preset:
+                    preset = line.split(":", 1)[1].strip()
+                elif line.startswith("Using kit:") and not resolved:
+                    resolved = line.split(":", 1)[1].strip()
+    return preset, resolved
+
+
 def main():
     a = parse_args()
     prefix = a.prefix or a.sample
+    preset, resolved = barbell_kit(a.barbell_log)
+    kit = dict(asked=a.kit, preset=preset, resolved=resolved or a.kit, known=preset in KITS, **KITS.get(preset, {}))
+    a.structure = bool(kit.get("structure"))
+    a.gene_start, a.gene_end = kit.get("gene_start", 0), kit.get("gene_end", 0)
+    if a.structure and a.frame:
+        with open(a.frame) as h:
+            kit["frame_ref"] = h.readline()[1:].strip().split(" ", 1)[-1]  # the frame's FASTA description
     t0 = time.time()
     timing = {}
     calls, assign = read_emu(a.abundance, a.assignments)
@@ -675,7 +712,7 @@ def main():
             o.write("\t".join(str(x) for x in r + vals) + "\n")
             for t, p in assign.get(rid, ()):
                 sum_p[t][b] += p
-                n_p50[t][b] += p >= 0.5
+                n_p50[t][b] += p >= SELECT_P
     for c in calls:
         c["sum_p"] = dict(sum_p.get(c["tax_id"], {}))
         c["reads_p50"] = dict(n_p50.get(c["tax_id"], {}))
@@ -690,7 +727,9 @@ def main():
         filter_rule=dict(min_length=a.min_length, max_length=a.max_length, min_accuracy=a.min_accuracy),
         filter_mismatch=dict(mismatch), filter_mismatch_examples=examples,
         reads_not_in_input=unknown,
-        thresholds=dict(min_gain=a.min_gain, min_side=a.min_side, min_fit=a.min_fit, gene_start=GENE_START, gene_end=GENE_END, full_margin=FULL_MARGIN),
+        kit=kit,
+        thresholds=dict(min_gain=a.min_gain, min_side=a.min_side, min_fit=a.min_fit, gene_start=a.gene_start, gene_end=a.gene_end, full_margin=FULL_MARGIN),
+        reference_rule=dict(max_species=a.max_species, refs_per_species=a.refs_per_species, select_p=SELECT_P, select_reads=a.select_reads),
         references=[{k: v for k, v in r.items() if k != "seq"} | dict(length=len(r["seq"])) for r in refs],
         calls=calls,
         seconds={k: round(v, 1) for k, v in timing.items()},

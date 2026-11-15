@@ -18,7 +18,7 @@ import re
 import statistics
 from html import escape as esc
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
 BUCKET_ORDER = ["full", "truncated", "foldback", "repeat", "tail", "chimera", "switch", "colinear", "poorfit", "unaligned"]
 BUCKET_LABEL = {
@@ -44,7 +44,6 @@ def parse_args():
     p.add_argument("--barbell-counts", default="", help="barbell_read_counts.tsv, whose run_input row is the run's read count")
     p.add_argument("--sheet", default="", help="barcodes sample sheet, optionally with sample_type and expected columns")
     p.add_argument("--call-check", default="", help="emu_call_check.tsv")
-    p.add_argument("--kit", default="")
     p.add_argument("--run-name", default="")
     p.add_argument("--run-path", default="", help="the run's fastq_pass folder; the run is named after the folder above it")
     p.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
@@ -365,8 +364,9 @@ def run_input(path):
     return None
 
 
-def pattern_group(flanks):
-    """Our grouping of barbell's patterns, from the flank positions of each match."""
+def pattern_group(flanks, window):
+    """Our grouping of barbell's patterns for a single-label kit, from the flank positions of each match.
+    window: barbell's split window for a second barcode one amplicon in, or None."""
     n = len(flanks)
     if n == 0:
         return "None"
@@ -382,19 +382,21 @@ def pattern_group(flanks):
     gap = b[0] - a[0]
     if gap <= 250:
         return "tandem_" + t
-    if 1350 <= gap <= 1750:
+    if window and window[0] <= gap <= window[1]:
         return "amplicon_" + t
     return "midread_" + t
 
 
-PATTERN_GROUPS = [
+def pattern_groups(window):
+    w = f"{window[0]}..{window[1]}" if window else ""
+    return [
     ("Ftag_left", "One Ftag at the start", "Ftag[fw,*,@left(0..250)]"),
     ("Fflank_left", "One flank at the start, no barcode", "Fflank[fw,*,@left(0..250)]"),
     ("None", "No tag found", "None"),
-    ("amplicon_TF", "Ftag, then a flank one amplicon in", "Ftag…Fflank@prev_left(1350..1750)"),
-    ("amplicon_TT", "Ftag, then another Ftag one amplicon in", "Ftag…Ftag@prev_left(1350..1750)"),
-    ("amplicon_FT", "Flank, then an Ftag one amplicon in", "Fflank…Ftag@prev_left(1350..1750)"),
-    ("amplicon_FF", "Two flanks one amplicon apart", "Fflank…Fflank@prev_left(1350..1750)"),
+    ("amplicon_TF", "Ftag, then a flank one amplicon in", f"Ftag…Fflank@prev_left({w})"),
+    ("amplicon_TT", "Ftag, then another Ftag one amplicon in", f"Ftag…Ftag@prev_left({w})"),
+    ("amplicon_FT", "Flank, then an Ftag one amplicon in", f"Fflank…Ftag@prev_left({w})"),
+    ("amplicon_FF", "Two flanks one amplicon apart", f"Fflank…Fflank@prev_left({w})"),
     ("tandem_TT", "Two Ftags within 250 bp", "Ftag…Ftag@prev_left(0..250)"),
     ("tandem_TF", "Ftag and flank within 250 bp", "Ftag…Fflank@prev_left(0..250)"),
     ("tandem_FT", "Flank and Ftag within 250 bp", "Fflank…Ftag@prev_left(0..250)"),
@@ -406,7 +408,7 @@ PATTERN_GROUPS = [
     ("single_elsewhere", "One match, not at the start", "…@left(250..)"),
     ("two_elsewhere", "Two matches, first not at the start", "…"),
     ("three_plus", "Three or more matches", "…"),
-]
+    ]
 
 
 def load(a):
@@ -416,6 +418,8 @@ def load(a):
         d = json.load(open(p))
         S[d["sample"]] = d
     order = [s for s in sheet if s in S] + sorted(s for s in S if s not in sheet)
+    kits = {json.dumps(S[s].get("kit") or {}, sort_keys=True) for s in order}
+    kit = json.loads(sorted(kits)[0]) if kits else {}
     group = {s: sheet.get(s, ("", []))[0] for s in order}
     expected = {s: sheet.get(s, ("", []))[1] for s in order}
 
@@ -432,6 +436,7 @@ def load(a):
              short_end=collections.defaultdict(collections.Counter), turn=collections.defaultdict(collections.Counter),
              bp=collections.Counter(), acc_sample=collections.defaultdict(collections.Counter), short_genus=collections.Counter())
     raw_ids = collections.defaultdict(set)
+    raw_bucket = {}  # raw read id -> buckets of its parts in the samples
     for p in a.tables:
         with gzip.open(p, "rt") as h:
             head = h.readline().rstrip("\n").split("\t")
@@ -458,6 +463,7 @@ def load(a):
                 if not b:
                     continue
                 T["bucket"][s][b] += 1
+                raw_bucket[raw_id(rid)] = raw_bucket.get(raw_id(rid), ()) + (b,)
                 if e:
                     T["bucket_emu"][s][b] += 1
                 if lc == "long":
@@ -474,12 +480,13 @@ def load(a):
                     T["short_end"][st][int(f[ix["fend"]]) // 25 * 25] += 1
                     T["short_genus"][f[ix["organism"]].split(" ")[0]] += 1
                 if b == "foldback":
-                    T["turn"][st][min(int(f[ix["turn1"]]) // 50 * 50, 1500)] += 1
-    return S, order, group, expected, check, T, raw_ids
+                    T["turn"][st][int(f[ix["turn1"]]) // 50 * 50] += 1
+    return S, order, group, expected, check, T, raw_ids, raw_bucket, kit, len(kits) > 1
 
 
-def barbell_tables(a, raw_ids):
-    """Run-level flow and pattern groups from barbell's tables and the raw reads."""
+def barbell_tables(a, raw_ids, raw_bucket, kit):
+    """Run-level flow and pattern groups from barbell's tables and the raw reads. The groups need a
+    single-label kit preset the read bucket scripts know; for any other kit they are left out."""
     if not (a.barbell_annotation and os.path.exists(a.barbell_annotation)):
         return None
     flanks = collections.defaultdict(list)
@@ -515,13 +522,16 @@ def barbell_tables(a, raw_ids):
     pat_len = collections.defaultdict(list)
     same = collections.Counter()
     sample_grp = collections.defaultdict(collections.Counter)
+    grp_bucket = collections.defaultdict(collections.Counter)
+    grouped = kit.get("tag_layout") == "single"
+    window = kit.get("split_window")
     owner = {}
     for s, ids in raw_ids.items():
         for r in ids:
             owner[r] = s
     for rid, fl in flanks.items():
         fl.sort()
-        g = pattern_group(fl)
+        g = pattern_group(fl, window) if grouped else ""
         pt = pattern.get(rid, "None")
         grp[g] += 1
         pat[pt] += 1
@@ -534,13 +544,18 @@ def barbell_tables(a, raw_ids):
             same[(g, "same" if fl[0][3] == fl[1][3] else "different")] += 1
         if rid in owner:
             sample_grp[owner[rid]][g] += 1
+        for b in raw_bucket.get(rid, ()):
+            grp_bucket[g][b] += 1
     # barbell's tables only list reads with a match; the rest of the run had no tag at all
     if raw is not None:
         grp["None"] += raw - len(flanks)
         pat["None"] += raw - len(flanks)
     B["no_tag"] = grp["None"] if raw is not None else None
     B["refused"] = B["annotated"] - B["written"]
+    B["grouped"] = grouped
+    B["window"] = window
     B["groups"] = grp
+    B["group_bucket"] = grp_bucket
     B["groups_written"] = grp_written
     B["patterns"] = [(p, n, pat_written[p], int(statistics.median(pat_len[p])) if pat_len[p] else None) for p, n in pat.most_common(15)]
     B["n_patterns"] = len(pat)
@@ -556,9 +571,14 @@ def main():
     if a.run_path and not a.run_name:
         path = os.path.normpath(a.run_path)
         a.run_name = os.path.basename(os.path.dirname(path)) if os.path.basename(path) == "fastq_pass" else os.path.basename(path)
-    S, order, group, expected, check, T, raw_ids = load(a)
-    B = barbell_tables(a, raw_ids)
+    S, order, group, expected, check, T, raw_ids, raw_bucket, kit, kit_differs = load(a)
+    B = barbell_tables(a, raw_ids, raw_bucket, kit)
     structure = any(S[s]["structure"] for s in order)
+    stages = {k: any(S[s].get("stages", {}).get(k) for s in order) for k in ("deacon", "filter", "downsampled", "assignments")}
+    thr = next((S[s]["thresholds"] for s in order if S[s]["structure"]), {})
+    G0, G1 = thr.get("gene_start", 0), thr.get("gene_end", 0)
+    frame = kit.get("frame", "")
+    refrule = next((S[s].get("reference_rule") for s in order if S[s].get("reference_rule")), {})
     typed = any(group[s] for s in order)
     gl = lambda s: GROUP_LABEL.get(group[s], group[s].capitalize()) if typed else ""
     ordered = sorted(order, key=lambda s: (GROUP_ORDER.index(group[s]) if group[s] in GROUP_ORDER else len(GROUP_ORDER), order.index(s)))
@@ -571,8 +591,10 @@ def main():
 
     title = f"Read buckets{(' — ' + esc(a.run_name)) if a.run_name else ''}"
     w(f'<h1>{title}</h1>')
-    w(f'<p class="sub">Where every read of the run went, and what the reads behind each emu call are made of. '
-      f'{len(order)} samples{", kit " + esc(a.kit) if a.kit else ""}. read_buckets {VERSION}.</p>')
+    kit_name = kit.get("resolved") or kit.get("asked") or ""
+    kit_txt = (f", kit {esc(kit_name)}" if kit_name else "") + (f" (barbell preset {esc(kit['preset'])})" if kit.get("preset") else "")
+    w(f'<p class="sub">Where every read of the run went{", and what the reads behind each emu call are made of" if structure else ""}. '
+      f'{len(order)} samples{kit_txt}. read_buckets {VERSION}.</p>')
 
     # ---------------------------------------------------------------- checks that the stages add up
     problems = []
@@ -588,10 +610,21 @@ def main():
         for k, v in (d.get("reads_not_in_input") or {}).items():
             if v:
                 problems.append(f"{esc(s)}: {v:,} reads in the {k} set are not among the sample's reads.")
+    if kit_differs:
+        problems.append("The samples' tables name different kits; the report uses the first.")
     if B and B["in_sample_not_written"]:
         problems.append(f"{B['in_sample_not_written']:,} reads in the samples are missing from barbell's filtered table.")
     if problems:
         w('<div class="warn"><b>The counts don\'t add up everywhere.</b><ul>' + "".join(f"<li>{x}</li>" for x in problems) + "</ul></div>")
+    # why the read structure is missing, when it is
+    if B and not kit.get("preset"):
+        w('<div class="note">barbell\'s log doesn\'t name the kit preset it used, so the barcode pattern groups and the read structure are left out.</div>')
+    elif B and not kit.get("known"):
+        w(f'<div class="note">The read bucket scripts don\'t know barbell\'s kit preset {esc(kit["preset"])}, so the barcode pattern groups and the read structure are left out.</div>')
+    elif kit.get("structure"):
+        skipped = [(s, S[s].get("structure_skipped")) for s in ordered if S[s].get("structure_skipped")]
+        if skipped:
+            w('<div class="note">No read structure for ' + "; ".join(f"{esc(s)}: {esc(y)}" for s, y in skipped) + ".</div>")
 
     # ---------------------------------------------------------------- headline numbers
     tot = collections.Counter()
@@ -610,8 +643,10 @@ def main():
         kv.append((pct(chim, n_emu), "of the reads emu sees are chimeric"))
     w('<div class="kv">' + "".join(f"<div><b>{x}</b><span>{y}</span></div>" for x, y in kv) + "</div>")
     if structure:
-        w('<div class="note"><b>Uncalibrated.</b> The chimera call and the read structure use thresholds chosen on one run, 2026-07-02 (pure cultures as negatives, reads of two cultures spliced together as positives), '
-          'and haven\'t been checked on another run with known composition. Treat the rates as descriptive. Calls between closely related species (two staphylococci, two klebsiellae) are under-counted.</div>')
+        w('<div class="note"><b>Uncalibrated.</b> The chimera call and the read structure use fixed thresholds, not fitted to this run, '
+          'that haven\'t been validated against samples of known composition. Treat the rates as descriptive. '
+          'Chimeras between closely related species, such as two species of one genus, are under-counted: a database variant of one parent can fit such a chimera almost as well as the pair does. '
+          'The pipeline\'s documentation (<code>docs/output.md</code>, Read buckets) says how the thresholds were chosen.</div>')
 
     # ---------------------------------------------------------------- flow
     w("<h2>Where the reads go</h2>")
@@ -638,69 +673,89 @@ def main():
         rows.append((gl(s), s, {k: 100 * f[k] / n for k, _, _ in used}, fmt(n)))
     w(legend([(n, c) for _, n, c in used]) + stacked(rows, used, xmax=100, value_fmt=lambda v: f"{v:.2f}% of the sample", tickfmt=lambda v: f"{v:.0f}%", title="Fate of each sample's reads"))
     rule = S[order[0]]["filter_rule"] if order else {}
-    w(f'<p class="cap">Share of each sample\'s reads by where they stop. The length window is {rule.get("min_length", "")}–{rule.get("max_length", "")} bp and the accuracy cut-off a mean per-base accuracy of '
-      f'{rule.get("min_accuracy", "")}%, as filtlong applies them. Right: reads in the sample.</p>')
+    if stages["filter"]:
+        w(f'<p class="cap">Share of each sample\'s reads by where they stop. The length window is {rule.get("min_length", "")}–{rule.get("max_length", "")} bp and the accuracy cut-off a mean per-base accuracy of '
+          f'{rule.get("min_accuracy", "")}%, as filtlong applies them. Right: reads in the sample.</p>')
+    else:
+        w('<p class="cap">Share of each sample\'s reads by where they stop. The reads were not filtered by length or quality. Right: reads in the sample.</p>')
     w(details("Table: fate of each sample's reads", table(["Sample"] + [n for _, n, _ in used] + ["Reads"],
                                                           [[s] + [fmt(T["fate"][s][k]) for k, _, _ in used] + [fmt(sum(T["fate"][s].values()))] for s in ordered],
                                                           numeric=tuple(range(1, len(used) + 2)))))
 
     # ---------------------------------------------------------------- notation
-    if B or structure:
+    if B:
         w("<h2>Notation</h2>")
         para("Barcode patterns follow Beeloo et al., <i>Barbell reveals and resolves demultiplexing and trimming issues in Nanopore data</i>: a read is a chain of matches joined by "
-             "<code>__</code>, each <code>type[orientation, label, position]</code>. For the 16S insert this report adds elements in the same style, marked <i>ours</i>.")
+             "<code>__</code>, each <code>type[orientation, label, position]</code>."
+             + (f" For the {esc(kit.get('amplicon', ''))} insert this report adds elements in the same style, marked <i>ours</i>." if structure else ""))
         terms = [
             ("Ftag", "paper", "Left flank, barcode and right flank found; the barcode is assigned."),
             ("Fflank", "paper", "The flank is found but no barcode passes barbell's cut-offs."),
             ("@left(0..250)", "paper", "Within 0–250 bp of the read start. <code>@prev_left(i..j)</code> counts from the previous match."),
             ("None", "paper", "No tag found anywhere in the read."),
-            ("Ins[fw|rc, A, s..e]", "ours", "An aligned stretch of 16S. <i>fw</i>: the read runs along the gene from the forward primer; <i>rc</i>: from the reverse primer. "
-                                            "<i>A</i> is the species, <i>s..e</i> the E. coli 16S positions where the stretch starts and ends, in read order."),
-            ("|", "ours", "A breakpoint where the species changes: <code>Ins[fw,A,28..k]|Ins[fw,B,k..1492]</code>."),
+        ]
+        if structure:
+            terms += [
+            ("Ins[fw|rc, A, s..e]", "ours", f"An aligned stretch of {esc(kit.get('amplicon', ''))}. <i>fw</i>: the read runs along the gene from the forward primer; <i>rc</i>: from the reverse primer. "
+                                            f"<i>A</i> is the species, <i>s..e</i> the {esc(frame)} positions where the stretch starts and ends, in read order."),
+            ("|", "ours", f"A breakpoint where the species changes: <code>Ins[fw,A,{G0}..k]|Ins[fw,B,k..{G1}]</code>."),
             ("Tail(n)", "ours", "n bases after the last aligned stretch that align to no reference."),
             ("Fold-back", "ours", "Two inserts in opposite orientations over the same part of the gene: the read turns and reads back along the other strand."),
             ("Same-strand repeat", "ours", "Two inserts in the same orientation over the same part of the gene."),
             ("Chimera", "ours", "One walk along the gene whose two ends fit two different species better than any one species does."),
-        ]
+            ]
         w(table(["Term", "Source", "Meaning"], [(Raw(f"<code>{esc(x)}</code>"), y, Raw(z)) for x, y, z in terms]))
-        arch = [
-            ("Expected", [("tag",), ("keep",), ("ins", 1465, "Ins[fw,A,28..1492]"), ("/keep",)], "Ftag[fw,*,@left(0..250)]__Ins[fw,A,28..1492]"),
-            ("Truncated", [("tag",), ("keep",), ("insrc", 620, "Ins[rc,A,1492..870]"), ("/keep",)], "Ftag[fw,*,@left(0..250)]__Ins[rc,A,1492..870]"),
-            ("Chimera", [("tag",), ("keep",), ("insrc", 700, "Ins[rc,A,1492..790]"), ("ins2rc", 765, "Ins[rc,B,790..28]"), ("/keep",)],
-             "Ftag[fw,*,@left(0..250)]__Ins[rc,A,1492..790]|Ins[rc,B,790..28]"),
-            ("Fold-back", [("tag",), ("keep",), ("insrc", 1465, "Ins[rc,A,1492..28]"), ("/keep",), ("flank",), ("ins", 1000, "Ins[fw,A,28..1030]")],
-             "Ftag[fw,*,@left(0..250)]__Ins[rc,A,1492..28]__Fflank[fw,*,@prev_left(1350..1750)]__Ins[fw,A,28..1030]"),
-            ("Two molecules", [("tag",), ("keep",), ("ins", 1465, "Ins[fw,A,28..1492]"), ("/keep",), ("tag",), ("keep",), ("insrc", 1465, "Ins[rc,B,1492..28]"), ("/keep",)],
-             "Ftag[fw,AB01,@left(0..250)]__Ins[fw,A,28..1492]__Ftag[fw,AB05,@prev_left(1350..1750)]__Ins[rc,B,1492..28]"),
-            ("Unaligned tail", [("tag",), ("keep",), ("ins", 1465, "Ins[fw,A,28..1492]"), ("tail", 300), ("/keep",)], "Ftag[fw,*,@left(0..250)]__Ins[fw,A,28..1492]__Tail(300)"),
-        ]
-        w(arch_panel(arch))
-        w('<p class="cap">Read architectures. Barcode tags as in the paper\'s Fig. 1: grey flanks, yellow barcode, a red zigzag where the barcode is missing. '
-          'The insert is an arrow towards the gene\'s 3′ end; a dashed box marks what barbell keeps after trimming. Tags are not to scale; inserts are.</p>')
+        if structure:
+            # example architectures, drawn to the kit's amplicon
+            n = G1 - G0
+            cut = lambda f: int(round((G0 + f * n) / 10)) * 10
+            k1, k2, k3 = cut(0.58), cut(0.52), cut(0.68)
+            win = B["window"]
+            nxt = f"@prev_left({win[0]}..{win[1]})" if win else "@prev_left(…)"
+            arch = [
+                ("Expected", [("tag",), ("keep",), ("ins", n, f"Ins[fw,A,{G0}..{G1}]"), ("/keep",)], f"Ftag[fw,*,@left(0..250)]__Ins[fw,A,{G0}..{G1}]"),
+                ("Truncated", [("tag",), ("keep",), ("insrc", G1 - k1, f"Ins[rc,A,{G1}..{k1}]"), ("/keep",)], f"Ftag[fw,*,@left(0..250)]__Ins[rc,A,{G1}..{k1}]"),
+                ("Chimera", [("tag",), ("keep",), ("insrc", G1 - k2, f"Ins[rc,A,{G1}..{k2}]"), ("ins2rc", k2 - G0, f"Ins[rc,B,{k2}..{G0}]"), ("/keep",)],
+                 f"Ftag[fw,*,@left(0..250)]__Ins[rc,A,{G1}..{k2}]|Ins[rc,B,{k2}..{G0}]"),
+                ("Fold-back", [("tag",), ("keep",), ("insrc", n, f"Ins[rc,A,{G1}..{G0}]"), ("/keep",), ("flank",), ("ins", k3 - G0, f"Ins[fw,A,{G0}..{k3}]")],
+                 f"Ftag[fw,*,@left(0..250)]__Ins[rc,A,{G1}..{G0}]__Fflank[fw,*,{nxt}]__Ins[fw,A,{G0}..{k3}]"),
+                ("Two molecules", [("tag",), ("keep",), ("ins", n, f"Ins[fw,A,{G0}..{G1}]"), ("/keep",), ("tag",), ("keep",), ("insrc", n, f"Ins[rc,B,{G1}..{G0}]"), ("/keep",)],
+                 f"Ftag[fw,x,@left(0..250)]__Ins[fw,A,{G0}..{G1}]__Ftag[fw,y,{nxt}]__Ins[rc,B,{G1}..{G0}]"),
+                ("Unaligned tail", [("tag",), ("keep",), ("ins", n, f"Ins[fw,A,{G0}..{G1}]"), ("tail", 300), ("/keep",)], f"Ftag[fw,*,@left(0..250)]__Ins[fw,A,{G0}..{G1}]__Tail(300)"),
+            ]
+            w(arch_panel(arch, scale=0.215 * 1465 / max(n, 1)))
+            w('<p class="cap">Read architectures, made-up examples. Barcode tags as in the paper\'s Fig. 1: grey flanks, yellow barcode, a red zigzag where the barcode is missing; '
+              '<i>x</i> and <i>y</i> are two different barcodes. '
+              'The insert is an arrow towards the gene\'s 3′ end; a dashed box marks what barbell keeps after trimming. Tags are not to scale; inserts are.</p>')
 
     # ---------------------------------------------------------------- barcode patterns
     if B:
         w("<h2>Barcode patterns</h2>")
         g = B["groups"]
         ntot = sum(g.values()) or 1
-        rows = []
-        for k, lab, pat in PATTERN_GROUPS:
-            if g[k]:
-                rows.append((Raw(f"<code>{esc(pat)}</code>"), lab, fmt(g[k]), pct(g[k], ntot, 2), fmt(B["groups_written"][k])))
-        w(table(["Pattern", "Meaning", "Reads", "Share", "Kept by barbell"], rows, numeric=(2, 3, 4)))
-        same = B["same"]
-        if same[("amplicon_TT", "same")] + same[("amplicon_TT", "different")]:
-            sa, di = same[("amplicon_TT", "same")], same[("amplicon_TT", "different")]
-            para(f"Of the {fmt(sa + di)} reads with a second Ftag one amplicon in, {fmt(di)} carry a different barcode the second time: two molecules read as one. "
-                 f"The other {fmt(sa)} repeat the first barcode. A flank without a barcode one amplicon in (<code>Ftag…Fflank</code>, {fmt(g['amplicon_TF'])} reads) "
-                 "was the signature of a fold-back in the 2026-07-02 run, where the read turns at the far end of the amplicon.")
+        if B["grouped"]:
+            rows = []
+            for k, lab, pat in pattern_groups(B["window"]):
+                if g[k]:
+                    rows.append((Raw(f"<code>{esc(pat)}</code>"), lab, fmt(g[k]), pct(g[k], ntot, 2), fmt(B["groups_written"][k])))
+            w(table(["Pattern", "Meaning", "Reads", "Share", "Kept by barbell"], rows, numeric=(2, 3, 4)))
+            w('<p class="cap">barbell\'s patterns grouped by the positions of their matches'
+              + (f"; one amplicon in is barbell\'s window of {B['window'][0]}–{B['window'][1]} bp from the previous match" if B["window"] else "")
+              + ".</p>")
+            same = B["same"]
+            if same[("amplicon_TT", "same")] + same[("amplicon_TT", "different")]:
+                sa, di = same[("amplicon_TT", "same")], same[("amplicon_TT", "different")]
+                para(f"Of the {fmt(sa + di)} reads with a second Ftag one amplicon in, {fmt(di)} carry a different barcode the second time: two molecules read as one. "
+                     f"The other {fmt(sa)} repeat the first barcode.")
         w(details(f"Table: the {len(B['patterns'])} most common of {B['n_patterns']:,} barbell patterns",
                   table(["Pattern", "Reads", "Kept by barbell", "Median raw length (bp)"],
                         [(Raw(f"<code>{esc(p)}</code>"), fmt(n), fmt(wr), fmt(m) if m else "–") for p, n, wr, m in B["patterns"]], numeric=(1, 2, 3))))
         ser = [("Fflank_left", "Flank only at the start", "--s6"), ("amplicon_TF", "Ftag…Fflank one amplicon apart", "--s2"),
                ("amplicon_TT", "Ftag…Ftag one amplicon apart", "--s1"), ("tandem_TT", "Two Ftags within 250 bp", "--s3"), ("rest", "Anything else", "--s4")]
+        if not B["window"]:
+            ser = [x for x in ser if not x[0].startswith("amplicon_")]
         rows = []
-        for s in ordered:
+        for s in ordered if B["grouped"] else ():
             v = B["sample_groups"].get(s, collections.Counter())
             n = sum(v.values())
             if not n:
@@ -713,12 +768,25 @@ def main():
             w(legend([(n, c) for _, n, c in ser]) + stacked(rows, ser, value_fmt=lambda v: f"{v:.2f}% of the sample's reads", tickfmt=lambda v: f"{v:g}%",
                                                             title="Barcode patterns other than one Ftag at the start, by sample"))
             w('<p class="cap">Reads of each sample whose raw read had a pattern other than <code>Ftag[fw,*,@left(0..250)]</code>, as a share of the sample\'s raw reads. Right: share with the plain pattern.</p>')
+        # what the reads of each pattern turned out to be
+        gb = B["group_bucket"]
+        if B["grouped"] and structure and gb:
+            cols = [b for b in BUCKET_ORDER if any(gb[k][b] for k in gb)]
+            rows = []
+            for k, lab, pat in pattern_groups(B["window"]):
+                n = sum(gb[k].values())
+                if n:
+                    rows.append([Raw(f"<code>{esc(pat)}</code>"), fmt(n)] + [pct(gb[k][b], n, 1) for b in cols])
+            w("<h3>Read structure by barcode pattern</h3>")
+            w(table(["Pattern of the raw read", "Reads in the samples"] + [BUCKET_LABEL[b] for b in cols], rows, numeric=tuple(range(1, len(cols) + 2))))
+            w('<p class="cap">The reads in the samples by the barcode pattern of the raw read they come from, and the share in each bucket. '
+              'A raw read barbell split in two counts once per part.</p>')
 
     # ---------------------------------------------------------------- structure
     if structure:
         w("<h2>What the reads are made of</h2>")
-        para("Each read is aligned to its sample's 16S references: savont's ASVs for the sample, named after the species of their closest database references, "
-             "and, for each species emu called, database references that most of the species' own reads hit best (one if an ASV already has the species, up to three if not). "
+        para(f"Each read is aligned to its sample's {esc(kit.get('amplicon', ''))} references: savont's ASVs for the sample, named after the species of their closest database references, "
+             f"and, for each species emu called, database references that most of the species' own reads hit best (one if an ASV already has the species, up to {refrule.get('refs_per_species', '')} if not). "
              "The read's path along the gene names its bucket. A read can be in only one bucket; fold-backs and repeats are named before the chimera test, "
              "because their extra length already explains them.")
         ref_rows = []
@@ -760,22 +828,22 @@ def main():
                 rows.append((gl(s), s, {"-": 100 * v["-"] / n, "+": 100 * v["+"] / n}, f"{pct(v['-'], n, 0)} reverse"))
         ser = [("-", "From the reverse primer (rc)", "--s1"), ("+", "From the forward primer (fw)", "--s2")]
         w(legend([(n, c) for _, n, c in ser]) + stacked(rows, ser, xmax=100, value_fmt=lambda v: f"{v:.1f}%", tickfmt=lambda v: f"{v:.0f}%", title="Starting primer by sample"))
-        w('<p class="cap">The primer a read starts from, read off the strand its first stretch aligns to. Barbell trims the primer with the flank, so it is not read directly; '
-          'in the 2026-07-02 run, where it was, strand and primer agreed for 99.95% of reads.</p>')
+        w('<p class="cap">The primer a read starts from, read off the strand its first stretch aligns to'
+          + (". Barbell trims the primer with the flank, so it is not read directly." if kit.get("primer_trimmed") else ".") + "</p>")
 
         # short reads
         if T["short_end"]:
             w("<h3>Short reads: where they stop</h3>")
-            bins = list(range(0, 1525, 25))
+            bins = list(range(0, (G1 // 25 + 2) * 25, 25))
             fw, rv = T["short_end"].get("+", {}), T["short_end"].get("-", {})
             nf, nr = sum(fw.values()), sum(rv.values())
             w(columns(bins, [("From the forward primer", "--s2", dict(fw))], height=150, title=f"Short reads from the forward primer ({fmt(nf)})",
-                      xlab="E. coli 16S position where the read ends (25 bp bins)", ticks_every=8))
+                      xlab=f"{frame} position where the read ends (25 bp bins)", ticks_every=8))
             w(columns(bins, [("From the reverse primer", "--s1", dict(rv))], height=150, title=f"Short reads from the reverse primer ({fmt(nr)})",
-                      xlab="E. coli 16S position where the read ends (25 bp bins)", ticks_every=8))
+                      xlab=f"{frame} position where the read ends (25 bp bins)", ticks_every=8))
             top = ", ".join(f"<i>{esc(k)}</i> {fmt(v)}" for k, v in T["short_genus"].most_common(6))
-            w(f'<p class="cap">Reads under the length window that align as one stretch, by the E. coli position of their last aligned base. Reads from the forward primer start near position 28 and run up the gene; '
-              f'reads from the reverse primer start near 1492 and run down it. A stop position shared across species points to the library or the chemistry rather than to one organism. '
+            w(f'<p class="cap">Reads under the length window that align as one stretch, by the {esc(frame)} position of their last aligned base. Reads from the forward primer start near position {G0} and run up the gene; '
+              f'reads from the reverse primer start near {G1} and run down it. A stop position shared across species points to the library or the chemistry rather than to one organism. '
               f'Short reads by genus: {top}.</p>')
 
         # long reads
@@ -793,16 +861,18 @@ def main():
             w(legend([(n, c) for _, n, c in BUCKET_SERIES]) + stacked(rows, BUCKET_SERIES, title="Reads over the length window by bucket"))
             w('<p class="cap">Reads over the length window that barbell kept, by bucket; reads, not shares. Right: all reads over the window, full-length ones included.</p>')
             if T["turn"]:
+                cap = (G1 // 50 + 1) * 50
                 for st, ttl, c in (("+", "Fold-backs that start at the forward primer", "--s2"), ("-", "Fold-backs that start at the reverse primer", "--s1")):
-                    d = T["turn"].get(st, {})
+                    d = collections.Counter()
+                    for k, v in T["turn"].get(st, {}).items():
+                        d[min(k, cap)] += v
                     if d:
-                        w(columns(list(range(0, 1550, 50)), [("Turn position", c, dict(d))], height=150, title=f"{ttl} ({fmt(sum(d.values()))})",
-                                  xlab="E. coli 16S position where the read turns (50 bp bins)", ticks_every=4))
+                        w(columns(list(range(0, cap + 50, 50)), [("Turn position", c, dict(d))], height=150, title=f"{ttl} ({fmt(sum(d.values()))})",
+                                  xlab=f"{frame} position where the read turns (50 bp bins)", ticks_every=4))
                 w('<p class="cap">Where fold-backs turn, all lengths. A turn at the far end of the amplicon reads one strand and then the other.</p>')
 
         # chimeras
         w("<h2>Chimeras (uncalibrated)</h2>")
-        thr = S[order[0]]["thresholds"]
         para(f"A read is chimeric when two species with one breakpoint explain it by at least {thr['min_gain']} score units more than the best single species does, "
              f"each side gains at least {thr['min_side']}, and the pair fits at least {thr['min_fit']} per base. Score: +1 per matching base, −1 per mismatch, inserted or deleted base. "
              "A read is scored only if it walks along the gene once; fold-backs and repeats are not.")
@@ -822,13 +892,12 @@ def main():
             c = sum(T["bucket"][s]["chimera"] for s in cult)
             n = sum(sum(T["bucket"][s].values()) for s in cult)
             para(f"In the pure cultures {fmt(c)} of {fmt(n)} reads ({pct(c, n, 3)}) are called chimeric. This is a weak negative control: a culture's references are its own ASVs and the species emu called in it, "
-                 "mostly one species and the database names that tie with it, so a false call between unrelated species can't happen there. "
-                 "In the 2026-07-02 calibration, where every culture was scored against all of the run's species, 29 of about 427,000 pure-culture reads were called chimeric.")
+                 "mostly one species and the database names that tie with it, so a false call between unrelated species can only happen in a culture where emu called more than one species.")
         w(table(["Sample", "Reads", "Chimeric", "Share", "Reach emu", "Chimeric", "Share", "Most common pairs"], tab, numeric=(1, 2, 3, 4, 5, 6)))
         if T["bp"]:
-            bins = list(range(0, 1525, 25))
+            bins = list(range(0, (G1 // 25 + 2) * 25, 25))
             w(columns(bins, [("Breakpoint", "--s5", dict(T["bp"]))], height=160, title=f"Where the species change, all chimeric reads ({fmt(sum(T['bp'].values()))})",
-                      xlab="E. coli 16S position of the breakpoint (25 bp bins)", ticks_every=8))
+                      xlab=f"{frame} position of the breakpoint (25 bp bins)", ticks_every=8))
 
         # emu calls
         w("<h2>What each emu call rests on</h2>")
@@ -868,7 +937,7 @@ def main():
             n = sum(h.values())
             if not n:
                 continue
-            q = sum(v for k, v in h.items() if k < rule.get("min_accuracy", 94))
+            q = sum(v for k, v in h.items() if k < rule["min_accuracy"])
             cum, med = 0, None
             for k in sorted(h):
                 cum += h[k]
@@ -881,24 +950,35 @@ def main():
 
     # ---------------------------------------------------------------- methods
     w("<h2>Methods and limits</h2>")
+    after = [x for x, on in (("host removal", stages["deacon"]), ("filtlong", stages["filter"])) if on]
+    sources = (["barbell's per-read tables"] if B else []) + ["each sample's reads" + (f" before and after {' and '.join(after)}" if after else "")] \
+        + (["emu's per-read assignments"] if stages["assignments"] else [])
+    listed = sources[0] if len(sources) == 1 else " and ".join(sources) if len(sources) == 2 else ", ".join(sources[:-1]) + ", and " + sources[-1]
     lim = [
-        "Every number is counted from the run's own files: barbell's per-read tables, each sample's reads before and after host removal and filtlong, and emu's per-read assignments. Nothing is estimated.",
-        "Barbell's patterns cover the raw reads; the read structure covers the reads barbell kept for a sample. Reads barbell refused or put in a barcode with no sample are counted, not aligned.",
+        f"Counts come from the run's own files: {listed}. "
+        "The only model-based numbers are emu's: its estimated read counts and abundances, and the breakdown of each call, which weights every read by emu's assignment probability.",
     ]
+    if B:
+        lim.append("Barbell's patterns cover the raw reads; the read structure covers the reads barbell kept for a sample. Reads barbell refused or put in a barcode with no sample are counted, not aligned."
+                   if structure else "Barbell's patterns cover the raw reads. Reads barbell refused or put in a barcode with no sample are counted in the flow above, not in a sample.")
     if structure:
+        p = refrule.get("select_p", "")
         lim += [
-            "References: the sample's savont ASVs, each named after the species of its closest database references (an emu-called species wins a tie), and for each species emu called (up to 50) "
-            "database references chosen as those that most of the species' own reads (P ≥ 0.5) hit best: one if an ASV has the species, up to three if not. "
+            f"References: the sample's savont ASVs, each named after the species of its closest database references (an emu-called species wins a tie), and for each species emu called (up to {refrule.get('max_species', '')}) "
+            f"database references chosen as those that most of the species' own reads (P ≥ {p}) hit best: one if an ASV has the species, up to {refrule.get('refs_per_species', '')} if not. "
             "A species with neither can't be a parent, so its reads show up as poor fits or chimeras of its relatives.",
-            "Positions are on E. coli 16S (K-12 MG1655 rrsH, from emu's database), lifted through each reference's alignment to it; they can be a few bases off in variable regions.",
-            "Bucket order: unaligned, fold-back, same-strand repeat, strand switch, chimera, poor fit, unaligned tail or head, gapped, full length (spans the amplicon to within 100 bp at both ends), truncated.",
-            "The chimera thresholds come from the 2026-07-02 run, where the consensuses of the run's pure cultures were the references for every sample. With these references instead, "
-            "96.8–99.9% of each sample's reads in that run land in the same bucket, no pure-culture read is called chimeric (against 2–6 per culture), and four of the five mixes have between 11% fewer and 0.3% more chimeric reads. "
-            "In AB13, most chimeras of its two klebsiellae are missed (379 against 1,198): a database variant of one species can fit a chimera of two close relatives almost as well as the pair does, so treat the rates as lower bounds. "
-            "The same nine unexpected emu calls rest at least half on chimeric reads either way.",
-            "The starting primer is inferred from the strand of the first aligned stretch, because barbell trims the primer.",
+            f"Positions are on {esc(frame)}{', from ' + esc(kit['frame_ref'].split(';')[0]) if kit.get('frame_ref') else ''}, where the amplicon runs from {G0} to {G1}, "
+            "lifted through each reference's alignment to it; they can be a few bases off in variable regions.",
+            "Bucket order: unaligned, fold-back, same-strand repeat, strand switch, chimera, poor fit, unaligned tail or head, gapped, "
+            f"full length (spans the amplicon to within {thr.get('full_margin', '')} bp at both ends), truncated.",
+            f"The chimera thresholds (score gain ≥ {thr.get('min_gain', '')}, each side ≥ {thr.get('min_side', '')}, fit ≥ {thr.get('min_fit', '')} per base) are fixed in the pipeline, not fitted to this run, "
+            "and uncalibrated. The pipeline's documentation (<code>docs/output.md</code>, Read buckets) says how they were chosen and what is known about their errors. "
+            "Treat the chimera rates as lower bounds where the sample has close relatives.",
         ]
-    lim.append("Reads MinKNOW failed (fastq_fail) are not part of the run's input and are not counted.")
+        if kit.get("primer_trimmed"):
+            lim.append("The starting primer is inferred from the strand of the first aligned stretch, because barbell trims the primer.")
+    if a.run_path:
+        lim.append("Reads MinKNOW failed (fastq_fail) are not part of the run's input and are not counted.")
     w("<ul>" + "".join(f"<li>{x}</li>" for x in lim) + "</ul>")
     w('<p class="cap">Tables: <code>read_buckets_summary.tsv</code> (per sample), <code>read_buckets_calls.tsv</code> (per emu call), and per-sample read tables if kept.</p>')
 

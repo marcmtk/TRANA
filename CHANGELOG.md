@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - barbell from 086ab1d (0.3.3) to 2411b96 (upstream 0.4.0 merged into the fork's SQK-MAB114-24 16S/ITS presets). Upstream changed only the `barbell inspect -i` hint and CI, so demultiplexing is unchanged
+- The read bucket report no longer quotes results of the 2026-07-02 run: every number in it is counted in the run it describes, and the settings it states (gene range, full-length margin, reference rule, chimera thresholds) come from the per-sample tables. How the thresholds were chosen stays in `docs/output.md`
+- The read structure and the barcode pattern groups follow the kit preset barbell names in its log, so `--barbell_kit SQK-MAB114-24` gets them when barbell detects 16S, and an unknown preset gets barbell's patterns only, with a note saying why
+- The report adds a table of read structure by barcode pattern, shows the methods that apply to the run only (no barbell lines without barbell, no length window without filtlong), and lists samples whose structure was skipped
 
 ## [v2.0.0] - 2026-11-06
 
