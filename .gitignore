@@ -9,4 +9,7 @@ testing/
 testing*
 *.pyc
 null/
+# pixi is a local development environment, not a pipeline dependency
 .pixi/
+pixi.toml
+pixi.lock

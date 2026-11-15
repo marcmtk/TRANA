@@ -107,9 +107,7 @@ for some more info).
 ## Runs with barbell, deacon and savont
 
 ```bash
-pixi install   # Nextflow and podman; or use your own Nextflow with docker or singularity
-
-pixi run nextflow run main.nf \
+nextflow run main.nf \
   -profile podman,workstation \
   --merge_fastq_pass /path/to/run/fastq_pass \
   --barcodes_samplesheet sample_sheet.csv \
@@ -177,8 +175,10 @@ pixi run nextflow run main.nf \
   SAM EMU writes is about six times larger and is removed unless `--keep_files` is set).
 - **Krona plots:** the lineage comes from the EMU report itself, so no separate Krona
   taxonomy is needed and no taxon can fall out of the plot.
-- **Profiles:** `workstation` caps resources to 16 CPUs and 60 GB, as EMU otherwise asks for
-  72 GB. Barbell and savont need a container, so the `conda` profile only works with
+- **Profiles:** use your own Nextflow (25.04 or newer) and container engine: `podman`,
+  `docker` or `singularity`. `workstation` caps resources to 16 CPUs and 60 GB, as EMU
+  otherwise asks for 72 GB; on a smaller machine, set `process.resourceLimits` in a config
+  passed with `-c`. Barbell and savont need a container, so the `conda` profile only works with
   `--skip_barbell --run_savont false`.
 
 Demultiplexed reads aren't saved by default (`--save_merged_reads`), because they still

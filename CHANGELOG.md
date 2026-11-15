@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The read bucket report no longer quotes results of the 2026-07-02 run: every number in it is counted in the run it describes, and the settings it states (gene range, full-length margin, reference rule, chimera thresholds) come from the per-sample tables. How the thresholds were chosen stays in `docs/output.md`
 - The read structure and the barcode pattern groups follow the kit preset barbell names in its log, so `--barbell_kit SQK-MAB114-24` gets them when barbell detects 16S, and an unknown preset gets barbell's patterns only, with a note saying why
 - The report adds a table of read structure by barcode pattern, shows the methods that apply to the run only (no barbell lines without barbell, no length window without filtlong), and lists samples whose structure was skipped
+- `pixi.toml` and `pixi.lock` are no longer part of the repository, as pixi is only a local development environment. Bring your own Nextflow and container engine
 
 ## [v2.0.0] - 2026-11-06
 
